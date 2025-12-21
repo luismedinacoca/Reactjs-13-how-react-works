@@ -751,6 +751,227 @@ export default Tabbed;
 - [ ] Add React DevTools inspection guide - Include instructions on how to use React DevTools to inspect React Elements created via JSX vs direct calls, showing the structural differences
 
 
+## 🔧 04. Lesson 126 — _How Rendenring works - Overview_
+
+### 🧠 04.1 Context:
+
+**How Rendering Works - Overview** is a foundational lesson that explains React's rendering process, from initial mount to subsequent updates. Understanding rendering is crucial because it forms the basis for performance optimization, debugging, and writing efficient React applications.
+
+#### Definition and Purpose
+
+**Rendering** in React is the process of converting React components into actual DOM elements that users can see and interact with. The rendering process involves multiple phases:
+
+1. **Render Phase**: React calls component functions, creates React Elements, and builds a virtual representation of the UI
+2. **Commit Phase**: React applies changes to the actual DOM, updating what users see on screen
+3. **Re-render**: When state or props change, React re-runs the render phase and commits only the necessary updates
+
+#### The Rendering Cycle
+
+React follows a predictable rendering cycle:
+
+**Initial Render (Mount)**:
+- React calls `createRoot()` and renders the root component (`App`)
+- Each component function is called, creating React Elements
+- React builds a virtual tree of elements
+- React commits the tree to the DOM, creating actual HTML elements
+
+**Subsequent Renders (Update)**:
+- A trigger causes React to schedule a re-render (state change, prop change, parent re-render)
+- React calls component functions again, creating new React Elements
+- React compares (diffs) the new tree with the previous one
+- React commits only the differences to the DOM
+
+#### How Components are Displayed on Screen
+
+The journey from component code to screen involves several steps:
+
+1. **Component Function Execution**: React calls the component function (e.g., `Tabbed({ content })`)
+2. **JSX Compilation**: JSX is compiled into `React.createElement()` calls, creating React Elements
+3. **Virtual DOM Creation**: React builds a tree of React Elements (virtual representation)
+4. **Reconciliation**: React compares the new virtual tree with the previous one
+5. **DOM Updates**: React updates only the changed DOM nodes efficiently
+
+**Example from the Project** (`src/main.tsx`):
+```6:10:src/main.tsx
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+```
+This initial render creates the entire component tree: `App` → `Tabbed` → `Tab` (×4) + `TabContent`/`DifferentContent`.
+
+**Component Rendering Flow** (`src/components/Tabbed.tsx`):
+```11:25:src/components/Tabbed.tsx
+function Tabbed({ content }: TabbedProps) {
+  const [activeTab, setActiveTab] = useState(0);
+
+  return (
+    <div>
+      <div className="tabs">
+        <Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+      </div>
+
+      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+    </div>
+  );
+}
+```
+When `Tabbed` renders:
+- React calls `Tabbed` function with `content` prop
+- Creates React Elements for 4 `Tab` components
+- Conditionally creates React Element for `TabContent` or `DifferentContent`
+- Commits all elements to the DOM
+
+#### How Renders are Triggered
+
+Renders occur in specific scenarios:
+
+1. **Initial Mount**: When the app first loads (`createRoot().render()`)
+2. **State Updates**: When `useState` setter is called (e.g., `setActiveTab(1)`)
+3. **Prop Changes**: When a parent component passes new props
+4. **Parent Re-render**: When a parent component re-renders, children typically re-render too
+5. **Context Updates**: When a Context value changes and components consume it
+6. **Force Update**: Using `forceUpdate()` (class components) or `useReducer` dispatch
+
+**State Update Example** (`src/components/Tabbed.tsx`):
+```12:12:src/components/Tabbed.tsx
+const [activeTab, setActiveTab] = useState(0);
+```
+When a user clicks a `Tab` button:
+- `onClick={() => onClick(num)}` calls `setActiveTab(num)`
+- React schedules a re-render of `Tabbed`
+- React calls `Tabbed` function again with updated `activeTab` state
+- React creates new React Elements for all children
+- React reconciles and updates only changed DOM nodes (e.g., active tab class, content display)
+
+**Nested State Update Example** (`src/components/TabContent.tsx`):
+```8:9:src/components/TabContent.tsx
+const [showDetails, setShowDetails] = useState(true);
+const [likes, setLikes] = useState(0);
+```
+When `setLikes` is called:
+- Only `TabContent` component re-renders (not `Tabbed` or `Tab`)
+- React calls `TabContent` function again
+- Creates new React Elements
+- Updates only the DOM node showing the likes count
+
+#### Key Concepts
+
+**Render vs Commit**:
+- **Render Phase**: Pure, can be paused/resumed, can throw away work (React 18+ Concurrent Features)
+- **Commit Phase**: Synchronous, updates DOM, runs effects, cannot be interrupted
+
+**Re-render Optimization**:
+- React only re-renders components whose state/props changed
+- Parent re-renders don't always cause child re-renders (if props unchanged)
+- React.memo, useMemo, useCallback help prevent unnecessary re-renders
+
+**Batching**:
+- React batches multiple state updates into a single re-render
+- In React 18+, automatic batching works in all event handlers, promises, timeouts
+
+#### Examples from the Project
+
+**Initial Render Flow**:
+1. `main.tsx` calls `createRoot().render(<App />)`
+2. `App` renders, returns `<Tabbed content={content} />`
+3. `Tabbed` renders with `activeTab = 0`, returns 4 `Tab` elements + `TabContent`
+4. Each `Tab` renders with its props
+5. `TabContent` renders with `item={content[0]}`
+6. React commits entire tree to DOM
+
+**Re-render Flow** (User clicks Tab 2):
+1. `Tab` button click calls `setActiveTab(2)`
+2. React schedules re-render of `Tabbed`
+3. `Tabbed` renders with `activeTab = 2`
+4. All 4 `Tab` components re-render (to update active class)
+5. `TabContent` re-renders with `item={content[2]}`
+6. React reconciles: updates tab classes, updates content text
+7. React commits changes to DOM
+
+**State Reset Example** (Switching to Tab 4):
+1. User clicks Tab 4, `setActiveTab(3)` is called
+2. `Tabbed` re-renders with `activeTab = 3`
+3. Conditional renders `<DifferentContent />` instead of `<TabContent />`
+4. React unmounts `TabContent` instance (loses `likes` and `showDetails` state)
+5. React mounts new `DifferentContent` instance
+6. State is reset because it's a different component type
+
+#### Advantages
+
+- **Efficient Updates**: React only updates changed DOM nodes, not entire page
+- **Predictable**: Renders are triggered by explicit state/prop changes
+- **Automatic**: React handles scheduling and batching automatically
+- **Optimizable**: Can use memoization to prevent unnecessary re-renders
+- **Debuggable**: React DevTools shows render timing and causes
+
+#### Disadvantages
+
+- **Learning Curve**: Understanding when and why renders occur can be complex
+- **Performance Pitfalls**: Unnecessary re-renders can hurt performance if not optimized
+- **State Loss**: Switching component types resets state (can be unexpected)
+- **Debugging Complexity**: Tracing render causes in large apps can be difficult
+- **Over-rendering**: Easy to accidentally cause cascading re-renders
+
+#### When to Consider Alternatives
+
+- **Direct DOM Manipulation**: Only for third-party libraries that require it
+- **Web Components**: For framework-agnostic components (though React can wrap them)
+- **Server-Side Rendering**: Next.js, Remix for initial render on server
+- **Static Site Generation**: For content that doesn't change (Gatsby, Next.js SSG)
+
+#### Connection to Main Theme
+
+This lesson is essential because it explains:
+
+- **Why State Persists**: Component instances maintain state across re-renders when component type and position remain the same
+- **Why State Resets**: When component type changes (`TabContent` → `DifferentContent`), React creates a new instance
+- **Performance Implications**: Understanding renders helps optimize with React.memo, useMemo, useCallback
+- **Debugging**: Knowing render triggers helps identify why components re-render unexpectedly
+- **Best Practices**: Understanding renders guides when to lift state, use Context, or optimize components
+
+### ⚙️ 04.2 Updating section:
+
+#### 04.2.1 Quick **RECAP** before we get started:
+![](../img/section11-lecture126-001.png)
+
+#### 04.2.2 How Components are **DISPLAYED** on the screen:
+![](../img/section11-lecture126-002.png)
+
+#### 04.2.3 How renders are **TRIGGERED**
+![](../img/section11-lecture126-003.png)
+
+### 🐞 04.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| **Unnecessary re-renders of Tab components** | ⚠️ Identified | `src/components/Tabbed.tsx:17-20` - All 4 `Tab` components re-render whenever `activeTab` changes, even though only the active tab's className needs to update. The `onClick` prop (`setActiveTab`) is a new function reference on each render, which could cause issues if `Tab` were memoized. This leads to 4 unnecessary component function calls and React Element creations on every tab change. |
+| **TabContent re-renders even when item prop hasn't changed** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - When switching between tabs with the same content (e.g., Tab 0 → Tab 1 → Tab 0), `TabContent` re-renders even though the `item` prop is the same object reference. Without `React.memo`, React can't detect that props haven't changed and re-renders unnecessarily. |
+| **Potential render loop with content.at()** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - Using `content.at(activeTab)` creates a new reference check on every render. If `content` array is recreated on parent re-render, `TabContent` will re-render even if the actual item data hasn't changed. This could cause cascading re-renders in larger applications. |
+| **Missing render optimization for Tab component** | ⚠️ Identified | `src/components/Tab.tsx:7` - The `Tab` component doesn't use `React.memo`, so it re-renders on every parent render even when its props (`num`, `activeTab`, `onClick`) haven't changed. Since there are 4 `Tab` instances, this causes 4 unnecessary function calls and React Element creations. |
+| **Inline function creation in Tab onClick** | ⚠️ Identified | `src/components/Tab.tsx:9` - The `onClick={() => onClick(num)}` creates a new function on every render. While this works, it prevents React from optimizing re-renders and could cause issues if `Tab` were memoized. A stable function reference would be better. |
+| **TabContent state resets on every re-render trigger** | ℹ️ Low Priority | `src/components/TabContent.tsx:8-9` - When `Tabbed` re-renders (e.g., from a parent update), `TabContent` re-renders but maintains its state. However, if the component unmounts and remounts (e.g., switching to `DifferentContent` and back), state is lost. This is expected behavior but could be confusing for users. |
+| **No render performance monitoring** | ℹ️ Low Priority | The project doesn't include any render tracking or performance monitoring (e.g., `why-did-you-render`, React DevTools Profiler usage examples). This makes it difficult to identify unnecessary re-renders and optimize performance. |
+| **Missing explanation of render batching** | ℹ️ Low Priority | The code examples don't demonstrate React's automatic batching behavior (React 18+). For example, if multiple state updates occurred in quick succession, understanding batching would help developers write more efficient code. |
+
+### 🧱 04.4 Pending Fixes (TODO)
+
+- [ ] Add `React.memo` to `Tab.tsx` component to prevent unnecessary re-renders when props haven't changed (`src/components/Tab.tsx:7`)
+- [ ] Wrap `setActiveTab` in `useCallback` in `Tabbed.tsx` to provide stable function reference for memoized `Tab` components (`src/components/Tabbed.tsx:12`)
+- [ ] Add `React.memo` to `TabContent.tsx` with custom comparison function to prevent re-renders when `item` prop reference is the same (`src/components/TabContent.tsx:7`)
+- [ ] Replace inline arrow function in `Tab.tsx` onClick with a memoized handler using `useCallback` (`src/components/Tab.tsx:9`)
+- [ ] Replace `content.at(activeTab)` with `content[activeTab]` and add proper null checking to avoid potential undefined issues and improve performance (`src/components/Tabbed.tsx:23`)
+- [ ] Add explicit `key` props to `Tab` components in `Tabbed.tsx` to help React identify instances correctly during reconciliation (`src/components/Tabbed.tsx:17-20`)
+- [ ] Create a render performance monitoring utility - Add a custom hook `useRenderCount` that logs component render counts to help identify unnecessary re-renders
+- [ ] Add React DevTools Profiler usage documentation - Include examples of how to use React DevTools Profiler to analyze render performance in the project
+- [ ] Document render batching behavior - Add comments or examples explaining how React 18+ batches state updates automatically
+- [ ] Add render optimization examples - Create a comparison component showing optimized vs non-optimized rendering patterns
+
+
 
 
 
