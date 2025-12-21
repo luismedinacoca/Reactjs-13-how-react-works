@@ -451,6 +451,19 @@ This lesson is foundational because it explains:
 | **React Element** | JavaScript object describing what you want to render | `{type: 'button', props: {children: 'Hello'}, key: null, ref: null}` | - Plain object<br>- Describes what to render, doesn't render it<br>- Immutable |
 | **DOM Element** | Real node in the browser (HTML) | `<button style="color: blue;">Hello</button>` in the DOM | - Physically exists on the page<br>- Consumes browser resources<br>- Mutable |
 
+#### 02.2.6 Another comparative table:
+
+| Aspect / Concept      | Component                                                                 | Component Instance                                                                 | React Element                                                                                     | DOM Element                                                                              |
+|------------------------|---------------------------------------------------------------------------|------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| **What is it?**        | Function that defines reusable UI logic and structure.                    | **Not applicable** in modern React (functional components don’t create instances).  | JavaScript object describing what to render (immutable).                                          | Real HTML node in the browser.                                                           |
+| **Type**               | Function (e.g., `() => JSX`).                                             | N/A                                                                                | Plain JavaScript object (e.g., `{type, props, key, ref}`).                                        | DOM node (e.g., `HTMLButtonElement`).                                                    |
+| **Purpose / Role**     | Define UI structure and behavior using props, hooks, and JSX.              | N/A — state and effects are managed via Hooks, not instances.                       | Serve as a lightweight, immutable description for React’s reconciliation process.                 | Represent the actual, visible UI rendered in the browser.                                |
+| **How it’s Created**   | Defined by the developer as a function (e.g., `const Button = (props) => <button>{props.text}</button>;`). | N/A — React does **not** instantiate functional components.                        | Created via JSX or `React.createElement()` (e.g., `<Button text="Hi" />` → object).                | Created or updated by React’s renderer (e.g., `react-dom`) in the real DOM.              |
+| **Mutability**         | Immutable (function definition never changes).                            | N/A                                                                                | Immutable (new element created on every render if props/state change).                            | Mutable (can be modified directly, though React discourages this).                        |
+| **Example**            | `const Button = ({text}) => <button>{text}</button>;`                     | *No instance is created.*                                                          | `{type: Button, props: {text: "Hi"}, key: null, ref: null}`                                      | `<button>Hi</button>` in the browser DOM.                                                |
+| **Key Features**       | - Reusable<br>- Uses Hooks for state/effects<br>- Pure functions (ideally) | N/A                                                                                | - Lightweight<br>- Describes "what" to render<br>- Core unit of Virtual DOM                      | - Consumes browser memory/CPU<br>- Visible to user<br>- Final render output               |
+| **Use in React**       | Primary building block in modern React (functional + Hooks paradigm).      | Obsolete concept for functional components; React treats them as plain functions.   | Central to React’s rendering model—used for diffing and scheduling updates.                      | Final target of rendering; updated efficiently via React’s reconciliation.               |
+
 ### 🐞 02.3 Issues:
 
 | Issue | Status | Log/Error |
@@ -475,10 +488,267 @@ This lesson is foundational because it explains:
 - [ ] Document the instance lifecycle - Add comments explaining when React creates/destroys component instances in `Tabbed.tsx` when switching between `TabContent` and `DifferentContent`
 
 
+## 🔧 03. Lesson 125 — _Instances and Elements in Practice_
+
+### 🧠 03.1 Context:
+
+**Instances and Elements in Practice** is a practical lesson that demonstrates the critical difference between using JSX syntax to create React Elements versus calling component functions directly. This lesson is essential because it reveals how React's internal mechanisms work and why certain patterns break React's state management and reconciliation.
+
+#### Definition and Purpose
+
+This lesson explores three different ways to invoke React components:
+
+1. **Using JSX (Recommended)**: `<Component prop={value} />` - Creates a React Element that React can properly manage
+2. **Direct Function Call (Outside JSX)**: `Component({ prop: value })` - Executes the function directly, returning raw JSX/React Element without React's management
+3. **Direct Function Call (Inside JSX)**: `{Component({ prop: value })}` - Executes the function inside JSX, bypassing React's instance management
+
+#### When These Patterns Occur
+
+- **JSX Usage**: The standard and recommended way - used throughout the project (e.g., `<Tab num={0} />` in `Tabbed.tsx`)
+- **Direct Function Call Outside JSX**: Sometimes used for debugging or understanding React internals (e.g., `console.log(DifferentContent())`)
+- **Direct Function Call Inside JSX**: Occasionally used by mistake or for specific edge cases, but breaks React's state management
+
+#### Examples from the Project
+
+**Proper JSX Usage** (`src/components/Tabbed.tsx`):
+```17:20:src/components/Tabbed.tsx
+<Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+<Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+<Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+<Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+```
+This creates React Elements that React can properly track, manage state for, and reconcile efficiently.
+
+**React Element Structure** (from lesson 03.2.1):
+When using JSX like `<DifferentContent test={123} />`, React creates a React Element object with:
+- `type`: The component function
+- `props`: The props object (`{ test: 123 }`)
+- `$$typeof`: A Symbol for security (prevents XSS attacks)
+- `key` and `ref`: For React's reconciliation
+
+**Direct Function Call** (from lesson 03.2.2):
+Calling `DifferentContent()` directly executes the function and returns the JSX, but:
+- React doesn't create a proper instance
+- State management (hooks) won't work correctly
+- React can't track or reconcile the component properly
+- The `$$typeof` property may be missing or incorrect
+
+**Direct Function Call Inside JSX** (from lesson 03.2.3):
+Using `{TabContent({ item: content.at(0) })}` inside JSX:
+- Executes the function immediately
+- Returns JSX that React renders, but without proper instance management
+- State hooks (`useState`, `useEffect`) won't work as expected
+- React can't properly track component lifecycle
+- Each render creates a new "instance" without React's reconciliation benefits
+
+#### Key Differences and Implications
+
+**JSX vs Direct Function Call**:
+
+| Aspect | JSX (`<Component />`) | Direct Call (`Component()`) |
+|--------|----------------------|----------------------------|
+| **React Element Creation** | ✅ Creates proper React Element with `$$typeof` | ⚠️ Returns JSX/Element but may lack React metadata |
+| **State Management** | ✅ Hooks work correctly | ❌ Hooks don't work (no React instance) |
+| **Reconciliation** | ✅ React can efficiently diff and update | ❌ React can't track changes properly |
+| **Lifecycle Management** | ✅ Proper mount/unmount/update cycles | ❌ No lifecycle management |
+| **Security** | ✅ `$$typeof` Symbol prevents XSS | ⚠️ May lack security features |
+| **Performance** | ✅ Optimized by React's reconciliation | ❌ No optimization, re-renders everything |
+
+**Why `$$typeof` Matters**:
+
+The `$$typeof` property is a Symbol that React uses as a security feature. It prevents malicious code from creating fake React Elements that could be used in XSS attacks. When you use JSX, React automatically adds this property. When calling components directly, this property may be missing or incorrect.
+
+**State Management Breakdown**:
+
+When you call a component function directly (especially inside JSX), React doesn't create a proper component instance. This means:
+- `useState` hooks create new state on every render (no persistence)
+- `useEffect` hooks may run incorrectly or not at all
+- Component state is lost between renders
+- React can't optimize re-renders
+
+#### Advantages of Using JSX
+
+- **Proper State Management**: Hooks work correctly with React's instance system
+- **Security**: `$$typeof` Symbol prevents XSS attacks
+- **Performance**: React can efficiently reconcile and update only what changed
+- **Lifecycle Management**: Components have proper mount/unmount/update cycles
+- **Debugging**: React DevTools can properly track components
+- **Type Safety**: TypeScript can better validate JSX props
+
+#### Disadvantages of Direct Function Calls
+
+- **Broken State**: Hooks don't work correctly without React's instance management
+- **No Reconciliation**: React can't efficiently update the DOM
+- **Security Risk**: Missing `$$typeof` can expose XSS vulnerabilities
+- **Performance Issues**: Components re-render completely on every parent render
+- **Debugging Difficulties**: React DevTools can't track these components properly
+- **Unexpected Behavior**: Component behavior becomes unpredictable
+
+#### When Direct Function Calls Might Be Used
+
+While generally not recommended, direct function calls might be used for:
+
+- **Debugging**: Understanding what React Elements look like (`console.log(Component())`)
+- **Testing**: Some testing scenarios might call components directly
+- **Utility Functions**: Creating helper functions that return JSX (though these should typically be components)
+- **Learning**: Understanding React's internals (as in this lesson)
+
+However, in production code, **always use JSX** for component rendering.
+
+#### Alternatives to Consider
+
+- **Always Use JSX**: For all component rendering in production code
+- **Higher-Order Components (HOCs)**: If you need to wrap components, use HOCs that return JSX
+- **Render Props**: Use render props pattern instead of calling functions directly
+- **Custom Hooks**: Extract logic into hooks rather than calling components as functions
+- **Component Composition**: Compose components properly using JSX rather than function calls
+
+#### Connection to Main Theme
+
+This lesson is crucial because it demonstrates:
+
+- **How React Elements Work**: The structure and properties of React Elements created by JSX
+- **Why State Persists**: Proper React instances maintain state across renders
+- **Why Direct Calls Break State**: Without React's instance management, state is lost
+- **Security Features**: How React protects against XSS attacks with `$$typeof`
+- **Reconciliation Process**: Why React needs proper Elements to efficiently update the DOM
+- **Best Practices**: Why JSX is the standard and recommended approach
+
+Understanding these concepts helps developers:
+- Debug state management issues
+- Understand why certain patterns don't work
+- Appreciate React's internal architecture
+- Write more predictable and maintainable code
+
+### ⚙️ 03.2 Updating code according the context:
+
+#### 03.2.1 Using a component instance:
+```tsx
+/* src/components/Tabbed.tsx */
+import { useState } from "react";
+import DifferentContent from "./DifferentContent";
+import Tab from "./Tab";
+import TabContent from "./TabContent";
+import type { ContentItem } from "../App";
+
+interface TabbedProps {
+  content: ContentItem[];
+}
+function Tabbed({ content }: TabbedProps) {
+  const [activeTab, setActiveTab] = useState(0);
+  return (
+    <div>
+      <div className="tabs">
+        <Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+      </div>
+      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+    </div>
+  );
+}
+console.log(<DifferentContent test={123} />);  // 👈🏽 ✅
+export default Tabbed;
+```
+![component instance](../img/section11-lecture125-001.png)
+
+Notes:
+- `$$typeof`: security feature implemented by React in order to protect form scripting attacks.
+- `Symbols` can not be transmitted via JSON. That's not comming from an API call.
+
+#### 03.2.2 Calling this component directly:
+```tsx
+/* src/components/Tabbed.tsx */
+import { useState } from "react";
+import DifferentContent from "./DifferentContent";
+import Tab from "./Tab";
+import TabContent from "./TabContent";
+import type { ContentItem } from "../App";
+interface TabbedProps {
+  content: ContentItem[];
+}
+function Tabbed({ content }: TabbedProps) {
+  const [activeTab, setActiveTab] = useState(0);
+  return (
+    <div>
+      <div className="tabs">
+        <Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+      </div>
+      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+    </div>
+  );
+}
+console.log(DifferentContent());  // 👈🏽 ✅
+export default Tabbed;
+```
+![component instance in raw react element](../img/section11-lecture125-002.png)
+
+Notes:
+- it's showing the raw react element not an instance.
+
+#### 03.2.3 Calling inside a component:
+```tsx
+/* src/components/Tabbed.tsx */
+import { useState } from "react";
+import DifferentContent from "./DifferentContent";
+import Tab from "./Tab";
+import TabContent from "./TabContent";
+import type { ContentItem } from "../App";
+interface TabbedProps {
+  content: ContentItem[];
+}
+function Tabbed({ content }: TabbedProps) {
+  const [activeTab, setActiveTab] = useState(0);
+  return (
+    <div>
+      <div className="tabs">
+        <Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+      </div>
+      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+
+      {TabContent({ item: content.at(0) })}  {/* 👈🏽 ✅ */}
+
+    </div>
+  );
+}
+export default Tabbed;
+```
+![instance inside another component - no manage it state](../img/section11-lecture125-003.png)
+![instance inside another component](../img/section11-lecture125-004.png)
 
 
+### 🐞 03.3 Issues:
 
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| **Debug console.log statements left in code examples** | ⚠️ Identified | `docs/LECTURE_STEPS.md:651,685` - The documentation includes `console.log(<DifferentContent test={123} />)` and `console.log(DifferentContent())` as examples. While these are educational, they should be clearly marked as debug-only code and removed from production examples. These statements would execute on every render if left in actual component code. |
+| **Invalid prop passed to DifferentContent component** | ⚠️ Identified | `docs/LECTURE_STEPS.md:651` - The example shows `<DifferentContent test={123} />` but `DifferentContent` component (`src/components/DifferentContent.tsx`) doesn't accept any props. This could cause confusion and TypeScript errors if implemented. The prop is used for demonstration but doesn't match the actual component interface. |
+| **Direct function call pattern shown without warnings** | ⚠️ Identified | `docs/LECTURE_STEPS.md:716` - The documentation shows `{TabContent({ item: content.at(0) })}` as a valid pattern, but doesn't emphasize that this breaks React's state management. If `TabContent` uses hooks (which it does - `useState` for `showDetails` and `likes`), calling it directly will cause state to reset on every render, leading to unexpected behavior. |
+| **Missing explanation of hook behavior with direct calls** | ⚠️ Identified | The lesson demonstrates direct function calls but doesn't explicitly show how hooks fail when components are called directly. `TabContent` uses `useState` hooks that would break if called directly inside JSX, but this isn't demonstrated or explained in the examples. |
+| **No TypeScript error handling for direct calls** | ℹ️ Low Priority | When calling components directly like `TabContent({ item: content.at(0) })`, TypeScript may not catch prop validation errors as effectively as with JSX syntax. The documentation doesn't mention this type safety difference. |
+| **Example code uses content.at() which may return undefined** | ⚠️ Identified | `docs/LECTURE_STEPS.md:716` - The example `TabContent({ item: content.at(0) })` uses `content.at(0)` which could return `undefined` if the array is empty. While `TabContent` handles this with an early return, the example doesn't demonstrate proper error handling or validation. |
+| **Missing practical demonstration of state loss** | ⚠️ Identified | The lesson explains that direct calls break state management but doesn't include a practical example showing how `TabContent`'s `likes` and `showDetails` state would reset on every render if called directly. A working example would make the concept clearer. |
+| **Security implications of missing $$typeof not emphasized** | ℹ️ Low Priority | While the lesson mentions `$$typeof` as a security feature, it doesn't emphasize the XSS attack vector that this prevents. The documentation could better explain why this matters in production applications. |
 
+### 🧱 03.4 Pending Fixes (TODO)
+
+- [ ] Remove or clearly mark debug `console.log` statements in documentation examples (`docs/LECTURE_STEPS.md:651,685`) - Add comments indicating these are for educational purposes only and should not be used in production code
+- [ ] Fix invalid prop example in documentation (`docs/LECTURE_STEPS.md:651`) - Either update `DifferentContent` component to accept props or change the example to use a component that actually accepts props (like `TabContent`)
+- [ ] Add warning comments in documentation about direct function calls (`docs/LECTURE_STEPS.md:716`) - Emphasize that `{TabContent({ item: content.at(0) })}` breaks React's state management and should never be used in production
+- [ ] Create a practical demonstration component showing state loss with direct calls - Add a `BrokenTabContent.tsx` example that calls `TabContent` directly and demonstrates how `likes` and `showDetails` state resets on every render
+- [ ] Add explicit explanation of hook behavior with direct calls - Document in the lesson how `useState`, `useEffect`, and other hooks fail when components are called directly instead of using JSX
+- [ ] Add TypeScript interface validation example - Show how TypeScript catches prop errors differently with JSX vs direct calls, demonstrating the type safety benefits of JSX
+- [ ] Improve error handling in example code (`docs/LECTURE_STEPS.md:588`) - Replace `content.at(0)` with proper validation or use `content[0]` with a null check to demonstrate best practices
+- [ ] Add security section explaining XSS prevention - Expand the `$$typeof` explanation to include practical examples of how it prevents XSS attacks and why this matters in production applications
+- [ ] Create a comparison component demonstrating both patterns - Add a `ComponentComparison.tsx` that shows side-by-side the difference between JSX usage and direct calls, with visual indicators of state persistence
+- [ ] Add React DevTools inspection guide - Include instructions on how to use React DevTools to inspect React Elements created via JSX vs direct calls, showing the structural differences
 
 
 
@@ -530,3 +800,4 @@ This lesson is foundational because it explains:
 ```md
 - [ ]
 ```
+
