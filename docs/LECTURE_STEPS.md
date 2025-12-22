@@ -309,6 +309,8 @@ This setup is crucial because it sets the stage for exploring:
 - [ ] Add unit tests for main components (`Tab`, `TabContent`, `Tabbed`) to ensure correct functionality
 
 
+<br>
+
 ## 🔧 02. Lesson 124 — _Components, Instances, and Elements_
 
 ### 🧠 02.1 Context:
@@ -486,6 +488,12 @@ This lesson is foundational because it explains:
 - [ ] Add React DevTools setup instructions in documentation - Include steps for installing and using React DevTools to inspect component instances and React Elements
 - [ ] Create a demonstration component that logs React Elements - Add a `DebugElement.tsx` component that shows the structure of React Elements when rendered
 - [ ] Document the instance lifecycle - Add comments explaining when React creates/destroys component instances in `Tabbed.tsx` when switching between `TabContent` and `DifferentContent`
+
+
+<br>
+
+
+<br>
 
 
 ## 🔧 03. Lesson 125 — _Instances and Elements in Practice_
@@ -751,6 +759,9 @@ export default Tabbed;
 - [ ] Add React DevTools inspection guide - Include instructions on how to use React DevTools to inspect React Elements created via JSX vs direct calls, showing the structural differences
 
 
+<br>
+
+
 ## 🔧 04. Lesson 126 — _How Rendenring works - Overview_
 
 ### 🧠 04.1 Context:
@@ -970,6 +981,9 @@ This lesson is essential because it explains:
 - [ ] Add React DevTools Profiler usage documentation - Include examples of how to use React DevTools Profiler to analyze render performance in the project
 - [ ] Document render batching behavior - Add comments or examples explaining how React 18+ batches state updates automatically
 - [ ] Add render optimization examples - Create a comparison component showing optimized vs non-optimized rendering patterns
+
+<br>
+
 
 ## 🔧 05. Lesson 127 — _How Rendenring works - The Render Phase_
 
@@ -1293,6 +1307,253 @@ When `TabContent`'s `likes` state updates:
 - [ ] Optimize conditional rendering pattern - Consider using a single component with conditional content instead of switching between `TabContent` and `DifferentContent` to avoid Fiber tree restructuring
 - [ ] Add examples demonstrating React.memo impact - Create a comparison showing render counts with and without `React.memo` to visualize the optimization benefits
 
+<br>
+
+## 🔧 06. Lesson 128 — _How Rendering Works: The Commit Phase_
+
+### 🧠 06.1 Context:
+
+**How Rendering Works: The Commit Phase** is a crucial lesson that explains the final step of React's rendering cycle, where React applies changes to the actual DOM and executes side effects. Understanding the Commit Phase is essential because it explains when and how users see updates on screen, when side effects run, and why certain operations must be synchronous.
+
+#### Definition and Purpose
+
+The **Commit Phase** is the second and final part of React's rendering cycle where React:
+
+1. **Applies DOM Updates**: Takes the list of DOM changes from the Render Phase and applies them to the actual browser DOM
+2. **Executes Side Effects**: Runs `useEffect` hooks, `useLayoutEffect` hooks, and other side effects
+3. **Updates Refs**: Updates ref values for DOM elements and component instances
+4. **Synchronizes State**: Ensures the Fiber tree matches the committed DOM state
+5. **Triggers Browser Paint**: The browser paints the updated DOM to the screen
+
+**Critical Distinction**: Unlike the Render Phase, which is pure, interruptible, and can be discarded, the **Commit Phase is synchronous and cannot be interrupted**. Once the Commit Phase begins, React must complete all DOM updates and side effects before the browser can paint the screen.
+
+#### When the Commit Phase Occurs
+
+The Commit Phase happens immediately after the Render Phase completes:
+
+1. **After Initial Mount**: When `createRoot().render()` completes the Render Phase
+2. **After State Updates**: When a state change triggers a re-render and the Render Phase finishes
+3. **After Prop Changes**: When parent components pass new props and children complete rendering
+4. **After Reconciliation**: Once React has determined what DOM changes are needed
+
+**Important**: The Commit Phase **always** follows the Render Phase. You cannot have a Commit Phase without a Render Phase, but the Render Phase can occur without committing (e.g., if React discards the work in Concurrent Mode).
+
+**Example from the Project** (`src/main.tsx`):
+```6:10:src/main.tsx
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+)
+```
+
+When the app first loads:
+- **Render Phase**: React calls `App`, `Tabbed`, `Tab` (×4), and `TabContent` functions, creating React Elements and Virtual DOM
+- **Commit Phase**: React creates actual DOM nodes (`<div>`, `<button>`, etc.) and inserts them into `document.getElementById('root')`
+- **Browser Paint**: The browser displays the rendered UI to the user
+
+**State Update Example** (`src/components/Tabbed.tsx`):
+```11:24:src/components/Tabbed.tsx
+function Tabbed({ content }: TabbedProps) {
+  const [activeTab, setActiveTab] = useState(0);
+
+  return (
+    <div>
+      <div className="tabs">
+        <Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+      </div>
+
+      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+    </div>
+  );
+}
+```
+
+When a user clicks Tab 1:
+- **Render Phase**: `Tabbed` re-renders, creates new React Elements, reconciles with Fiber tree
+- **Commit Phase**: 
+  - Updates Tab 0's DOM: removes `active` class from `<button>`
+  - Updates Tab 1's DOM: adds `active` class to `<button>`
+  - Updates content area: changes text content if `TabContent` item prop changed
+- **Browser Paint**: User sees Tab 1 highlighted and new content displayed
+
+#### What Happens During Commit Phase
+
+The Commit Phase consists of three sub-phases:
+
+**1. Before Mutation (Pre-commit)**:
+- Runs `getSnapshotBeforeUpdate` (class components)
+- Prepares for DOM mutations
+- Captures current DOM state if needed
+
+**2. Mutation (Commit)**:
+- **DOM Updates**: Applies all DOM insertions, deletions, and updates
+- **Ref Updates**: Updates ref values to point to new DOM nodes
+- **Cleanup**: Runs cleanup functions from `useEffect` (for dependencies that changed)
+
+**3. Layout (Post-commit)**:
+- Runs `useLayoutEffect` hooks synchronously
+- Reads layout information (e.g., `getBoundingClientRect()`)
+- Triggers browser reflow/repaint
+- Runs `componentDidUpdate` (class components)
+
+**Example from the Project** (`src/components/TabContent.tsx`):
+```7:9:src/components/TabContent.tsx
+function TabContent({ item }: TabContentProps) {
+  const [showDetails, setShowDetails] = useState(true);
+  const [likes, setLikes] = useState(0);
+```
+
+When `setLikes(1)` is called:
+- **Render Phase**: `TabContent` re-renders, creates new React Element with `likes: 1`
+- **Commit Phase**:
+  - **Mutation**: Updates the `<span>{likes} ❤️</span>` DOM node's text content from "0 ❤️" to "1 ❤️"
+  - **Layout**: Browser recalculates layout (if needed), triggers repaint
+- **After Commit**: Any `useEffect` hooks run (if dependencies changed)
+
+#### ReactDOM and Renderers
+
+React uses different **renderers** to commit changes to different environments:
+
+- **ReactDOM**: Commits to browser DOM (HTML elements)
+- **React Native**: Commits to native mobile UI components
+- **React Three Fiber**: Commits to WebGL/Three.js 3D scenes
+- **React PDF**: Commits to PDF documents
+
+**Example from the Project** (`src/main.tsx`):
+```1:2:src/main.tsx
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+```
+
+The `react-dom` package provides the `createRoot` function, which creates a ReactDOM root. When React commits changes, ReactDOM translates React Elements into actual HTML DOM nodes.
+
+**Key Point**: The Render Phase is renderer-agnostic (works the same for all renderers), but the Commit Phase is renderer-specific (ReactDOM commits to DOM, React Native commits to native components).
+
+#### Browser Paint and Visual Updates
+
+After the Commit Phase completes, the browser performs:
+
+1. **Reflow**: Recalculates element positions and sizes
+2. **Repaint**: Redraws affected areas of the screen
+3. **Composite**: Combines layers for final display
+
+**Performance Consideration**: The Commit Phase is synchronous, so long-running operations during commit can block the browser's main thread, causing janky animations or unresponsive UI.
+
+**Example**: If `TabContent` had a `useLayoutEffect` that performs expensive calculations:
+```typescript
+useLayoutEffect(() => {
+  // This runs synchronously during Commit Phase
+  // Long operations here block browser paint
+  const rect = elementRef.current?.getBoundingClientRect();
+  // ... expensive calculations
+}, [dependencies]);
+```
+
+This would delay the browser paint until the effect completes.
+
+#### Key Differences: Render Phase vs Commit Phase
+
+| Aspect | Render Phase | Commit Phase |
+|--------|--------------|--------------|
+| **Purpose** | Create Virtual DOM, reconcile changes | Apply changes to real DOM |
+| **Interruptible** | ✅ Yes (React 18+ Concurrent Features) | ❌ No (synchronous) |
+| **Can be Discarded** | ✅ Yes (if higher priority work arrives) | ❌ No (must complete) |
+| **DOM Updates** | ❌ No DOM changes | ✅ Updates actual DOM |
+| **Side Effects** | ❌ No effects run | ✅ `useEffect`, `useLayoutEffect` run |
+| **Performance** | Fast (JavaScript objects) | Slower (DOM operations) |
+| **Browser Paint** | ❌ No visual changes | ✅ Triggers paint |
+
+#### Advantages
+
+- **Predictable Timing**: Side effects run at predictable times (after DOM updates)
+- **Synchronous Updates**: DOM updates happen atomically, preventing partial states
+- **Performance**: Batching DOM updates minimizes browser reflows/repaints
+- **Debugging**: React DevTools can track commit timing and side effects
+- **User Experience**: Changes appear together, preventing visual glitches
+
+#### Disadvantages
+
+- **Blocking**: Long commit phases can block the browser's main thread
+- **Synchronous**: Cannot be interrupted, even for high-priority updates
+- **Performance Impact**: DOM operations are slower than JavaScript operations
+- **Browser Reflow**: Can trigger expensive browser reflows/repaints
+- **Complexity**: Understanding when effects run can be confusing
+
+#### When to Consider Alternatives
+
+- **useLayoutEffect vs useEffect**: Use `useLayoutEffect` for DOM measurements that must happen before paint, `useEffect` for async side effects
+- **Direct DOM Manipulation**: Only for third-party libraries that require it (e.g., D3.js, Chart.js)
+- **Web Workers**: For expensive calculations that shouldn't block the Commit Phase
+- **RequestAnimationFrame**: For animations that need to sync with browser paint
+- **Deferred Values**: React 18+ `useDeferredValue` for non-urgent updates
+
+#### Connection to Main Theme
+
+This lesson is essential because it explains:
+
+- **When Users See Changes**: The Commit Phase is when visual updates appear on screen
+- **When Side Effects Run**: `useEffect` and `useLayoutEffect` execute during Commit Phase
+- **Why State Persists**: After commit, the Fiber tree matches the DOM, maintaining state consistency
+- **Performance Implications**: Understanding commit helps optimize with `useMemo`, `useCallback`, and `React.memo` to reduce commit work
+- **Debugging**: Knowing commit timing helps debug when effects run and why UI updates appear when they do
+- **Best Practices**: Understanding commit guides when to use `useLayoutEffect` vs `useEffect` and how to avoid blocking commits
+
+**Practical Example from the Project**:
+When switching from Tab 0 to Tab 1:
+1. **Render Phase**: `Tabbed` re-renders, creates new Virtual DOM, reconciles
+2. **Commit Phase**:
+   - Updates Tab 0 button: `className` changes from "tab active" to "tab"
+   - Updates Tab 1 button: `className` changes from "tab" to "tab active"
+   - Updates content area: `TabContent` receives new `item` prop
+3. **Browser Paint**: User sees Tab 1 highlighted and new content
+4. **After Commit**: If `TabContent` had `useEffect` hooks, they would run now
+
+### ⚙️ 06.2 Updating code according the context:
+
+#### 06.2.1 **Commit** phase and browser **paint**
+
+![ReactDOM](../img/section11-lecture128-001.png)
+
+![Renderers](../img/section11-lecture128-002.png)
+
+#### 06.2.2 **RECAP**: Putting it all together:
+![Recap](../img/section11-lecture128-003.png)
+
+### 🐞 06.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| **No useEffect hooks demonstrating Commit Phase timing** | ⚠️ Identified | `src/components/TabContent.tsx:7` - The component doesn't use `useEffect` or `useLayoutEffect` hooks, so there's no demonstration of when side effects run during the Commit Phase. Adding examples would help developers understand the difference between Render Phase and Commit Phase execution timing. |
+| **Missing useLayoutEffect examples for synchronous DOM access** | ⚠️ Identified | The project doesn't include examples of `useLayoutEffect` for DOM measurements that must happen before browser paint. This would demonstrate the Layout sub-phase of the Commit Phase and help developers understand when to use `useLayoutEffect` vs `useEffect`. |
+| **No demonstration of commit phase blocking behavior** | ⚠️ Low Priority | The project doesn't show how long-running operations during commit can block the browser's main thread. Adding examples or documentation would help developers understand performance implications of the Commit Phase. |
+| **Missing cleanup function examples in useEffect** | ⚠️ Identified | `src/components/TabContent.tsx` - If `useEffect` hooks were added, there are no examples showing cleanup functions that run during the Commit Phase's Mutation sub-phase. This is important for understanding when cleanup occurs relative to DOM updates. |
+| **No ref updates demonstrated during Commit Phase** | ℹ️ Low Priority | The project doesn't use refs (`useRef`) to demonstrate how ref values are updated during the Commit Phase. Adding ref examples would show how React synchronizes refs with DOM nodes after mutations. |
+| **Missing documentation on commit phase sub-phases** | ℹ️ Low Priority | The lesson doesn't explicitly explain the three sub-phases of Commit Phase (Before Mutation, Mutation, Layout) and when each occurs. Adding this detail would provide a more complete understanding of the Commit Phase. |
+| **No performance monitoring for commit phase duration** | ℹ️ Low Priority | The project doesn't include tools or examples for measuring Commit Phase performance (e.g., React DevTools Profiler, Performance API). This makes it difficult to identify commit phase bottlenecks. |
+| **TabContent state updates trigger commit but no visual feedback** | ⚠️ Identified | `src/components/TabContent.tsx:28` - When `likes` state updates, the Commit Phase updates the DOM, but there's no visual transition or animation to demonstrate the commit happening. Adding CSS transitions would make the commit phase more observable. |
+| **Missing examples of batching multiple state updates in single commit** | ℹ️ Low Priority | The project doesn't demonstrate how React batches multiple state updates into a single Commit Phase. For example, if multiple `setLikes` calls happened quickly, they would be batched, but this isn't demonstrated or explained. |
+| **No demonstration of commit phase vs render phase separation** | ⚠️ Identified | The code doesn't include comments or examples clearly separating Render Phase work (creating React Elements) from Commit Phase work (updating DOM). Adding explicit examples would help developers understand the distinction. |
+
+### 🧱 06.4 Pending Fixes (TODO)
+
+- [ ] Add `useEffect` hook to `TabContent.tsx` to demonstrate Commit Phase timing - Add an effect that logs when it runs, showing it executes after DOM updates during Commit Phase (`src/components/TabContent.tsx`)
+- [ ] Add `useLayoutEffect` example for DOM measurements - Create a demonstration showing `useLayoutEffect` running synchronously during Commit Phase's Layout sub-phase, before browser paint
+- [ ] Add cleanup function example in `useEffect` - Demonstrate how cleanup functions run during Commit Phase's Mutation sub-phase when dependencies change (`src/components/TabContent.tsx`)
+- [ ] Add `useRef` example demonstrating ref updates during Commit Phase - Show how ref values are synchronized with DOM nodes after mutations
+- [ ] Document Commit Phase sub-phases - Add detailed explanation of Before Mutation, Mutation, and Layout sub-phases in the Context section (06.1)
+- [ ] Add React DevTools Profiler usage for Commit Phase - Include examples of how to use React DevTools Profiler to measure Commit Phase duration and identify bottlenecks
+- [ ] Add CSS transitions to demonstrate Commit Phase visually - Add transitions to `TabContent` likes counter to make DOM updates during Commit Phase more observable (`src/components/TabContent.tsx:28`)
+- [ ] Add comments separating Render Phase from Commit Phase - Add explicit comments in `Tabbed.tsx` and `TabContent.tsx` showing where Render Phase ends and Commit Phase begins
+- [ ] Create demonstration of state update batching - Add example showing how multiple rapid `setLikes` calls are batched into a single Commit Phase
+- [ ] Add performance monitoring utility for Commit Phase - Create a custom hook `useCommitPhaseMonitor` that measures and logs Commit Phase duration using Performance API
+- [ ] Add example of blocking commit phase behavior - Create a demonstration component showing how long-running operations during commit can block browser paint
+- [ ] Document when to use `useLayoutEffect` vs `useEffect` - Add guidance explaining that `useLayoutEffect` runs synchronously during Commit Phase (before paint) while `useEffect` runs asynchronously (after paint)
+
+
 
 
 
@@ -1315,6 +1576,8 @@ When `TabContent`'s `likes` state updates:
 ---
 
 🔥 🔥 🔥
+
+<br>
 
 ## 🔧 XX. Lesson YYY — _{{TITLE_NAME}}_
 
