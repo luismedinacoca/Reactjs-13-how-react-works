@@ -2174,7 +2174,6 @@ We've got different component is rendered in the same position in the tree. It's
 
 ### 🧱 08.4 Pending Fixes (TODO)
 
-```md
 - [ ] Fix typo in documentation: Change "DiffernetContent" to "DifferentContent" in `docs/LECTURE_STEPS.md:1963`
 - [ ] Consider adding user feedback mechanism to explain state preservation behavior when switching between Tabs 1-3 (e.g., tooltip or info message explaining that state persists because same component type is used)
 - [ ] Consider adding visual indicator or warning when switching to Tab 4 that explains state will be reset (e.g., "Switching to Tab 4 will reset your current tab's state")
@@ -2182,7 +2181,194 @@ We've got different component is rendered in the same position in the tree. It's
 - [ ] Refactor hardcoded `activeTab <= 2` condition in `src/components/Tabbed.tsx:23` to use dynamic `activeTab < content.length` for better extensibility
 - [ ] Add comments in `src/components/Tabbed.tsx` explaining the diffing behavior: why state persists across Tabs 1-3 and resets with Tab 4
 - [ ] Consider adding a reset button or clear state functionality to allow users to manually reset tab state if needed
+
+<br>
+
+## 🔧 09. Lesson 131 — _The Key Prop_:
+
+### 🧠 09.1 Context:
+
+The **`key` prop** is a special React attribute that helps React identify which items have changed, been added, or removed from a list. It's also used to force React to reset component state by changing the key value.
+
+#### Definition and Explanation
+
+The `key` prop serves two main purposes:
+
+1. **List Reconciliation**: When rendering lists of elements, React uses keys to efficiently identify which elements correspond to which items in the data array. This allows React to minimize DOM operations when items are added, removed, or reordered.
+
+2. **State Reset**: By changing a component's `key` value, React treats it as a completely new component instance, forcing it to unmount the old instance and mount a new one, which resets all internal state.
+
+#### When It Occurs/Is Used
+
+**Keys in Lists**:
+- **Required** when rendering arrays of elements using `.map()`, `.filter()`, or similar array methods
+- React uses keys to match elements between renders
+- Without keys, React relies on element position, which can cause bugs when list order changes
+
+**Keys for State Reset**:
+- Used when you want to force a component to reset its state
+- Changing the `key` prop value tells React to destroy the old component instance and create a new one
+- Useful when switching between different data sources or when you want to reset form state
+
+#### Examples from the Project
+
+**Current Implementation Without Keys** (`src/components/Tabbed.tsx`):
+```17:20:src/components/Tabbed.tsx
+<Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+<Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+<Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+<Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
 ```
+Currently, `Tab` components are rendered manually without `key` props. While this works, adding explicit keys would improve reconciliation clarity.
+
+**State Persistence Issue** (`src/components/Tabbed.tsx:23`):
+```23:23:src/components/Tabbed.tsx
+{activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+```
+The `TabContent` component maintains its state (`likes`, `showDetails`) when switching between tabs because React sees it as the same component instance. To reset state when switching tabs, we could use a `key` prop tied to `activeTab`.
+
+**Potential List Rendering** (if refactored to use `.map()`):
+If the tabs were rendered from an array, keys would be essential:
+```tsx
+tabs.map((tab, index) => <Tab key={tab.id} num={index} ... />)
+```
+
+#### Advantages
+
+- **Efficient Reconciliation**: Helps React identify which elements changed, reducing unnecessary DOM updates
+- **Prevents State Bugs**: Ensures correct state association with list items when order changes
+- **State Reset Control**: Provides a simple way to reset component state without lifting state up
+- **Performance**: Improves rendering performance for dynamic lists
+- **Predictable Behavior**: Makes component lifecycle predictable when keys change
+
+#### Disadvantages
+
+- **Must Be Unique**: Keys must be unique among siblings, which can be challenging with dynamic data
+- **Must Be Stable**: Keys should remain stable across renders (not use array indices if order changes)
+- **Not Accessible in Component**: Keys are not passed as props to components - they're used internally by React
+- **Overuse Can Cause Issues**: Changing keys unnecessarily can cause performance problems and unexpected unmounts
+- **Learning Curve**: Requires understanding when to use stable vs. changing keys
+
+#### When to Consider Alternatives
+
+- **Lift State Up**: If you need state to persist across key changes, lift state to a parent component
+- **Controlled Components**: For forms, consider controlled components with explicit state management instead of relying on key changes
+- **State Management Libraries**: For complex state reset scenarios, consider Context API or external state management
+- **Component Composition**: Sometimes restructuring components is better than using keys to reset state
+- **Stable Keys for Lists**: Always use stable, unique identifiers (like IDs from database) rather than array indices when list order can change
+
+#### Connection to Main Theme
+
+This lesson demonstrates:
+
+- **Practical Application**: Shows how `key` prop affects React's reconciliation algorithm
+- **State Lifecycle Control**: Explains how to control when components are created, reused, or destroyed
+- **List Rendering Best Practices**: Guides proper use of keys in dynamic lists
+- **State Reset Pattern**: Demonstrates a common pattern for resetting component state
+- **Performance Optimization**: Shows how keys improve React's rendering efficiency
+
+**Practical Example from the Project**:
+
+The current tabbed interface could benefit from `key` prop in two ways:
+
+1. **Adding keys to Tab components** for better reconciliation:
+```tsx
+<Tab key={0} num={0} ... />
+<Tab key={1} num={1} ... />
+```
+
+2. **Using key on TabContent to reset state** when switching tabs:
+```tsx
+<TabContent key={activeTab} item={content.at(activeTab)} />
+```
+This would reset `likes` and `showDetails` state each time the user switches tabs, providing independent state per tab.
+
+### ⚙️ 09.2 Updating code according the context:
+
+#### 09.2.1 What is the **key** prop?
+
+![What is the key prop?](../img/section11-lecture131-001.png)
+
+The `key` prop is a special string attribute that React uses to identify elements in lists. It helps React determine which items have changed, been added, or removed, enabling efficient updates to the DOM.
+
+#### 09.2.2 Keys in **lists** [Stable Key]
+
+![Keys in lists - Stable Key](../img/section11-lecture131-002.png)
+
+When rendering lists, keys should be:
+- **Unique**: Each key must be unique among siblings
+- **Stable**: Keys should remain the same across renders for the same item
+- **Predictable**: Keys should be based on the item's identity, not its position
+
+**Example**: If we refactored `Tabbed` to render tabs from an array:
+```tsx
+const tabs = [0, 1, 2, 3];
+return (
+  <div className="tabs">
+    {tabs.map((num) => (
+      <Tab key={num} num={num} activeTab={activeTab} onClick={setActiveTab} />
+    ))}
+  </div>
+);
+```
+
+#### 09.2.3 Key Prop to **Reset State** [Changing Key]
+
+![Key Prop to Reset State - Changing Key](../img/section11-lecture131-003.png)
+
+By changing a component's `key` value, React treats it as a completely new component instance. This causes:
+- The old instance to unmount (state is lost)
+- A new instance to mount (state is reset to initial values)
+
+This is useful when you want to reset component state without lifting state up to a parent.
+
+#### 09.2.4 Key Prop to **Reset State** [Changing Key] - example:
+
+![Key Prop to Reset State - Changing Key - example](../img/section11-lecture131-004.png)
+
+**Current Implementation** (`src/components/Tabbed.tsx:23`):
+```tsx
+{activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+```
+
+**Updated Implementation with Key Prop**:
+```tsx
+{activeTab <= 2 ? (
+  <TabContent key={activeTab} item={content.at(activeTab)} />
+) : (
+  <DifferentContent />
+)}
+```
+
+**What This Changes**:
+- When `activeTab` changes from 0 to 1, React sees `key={0}` → `key={1}`
+- React unmounts the old `TabContent` instance (with its `likes` and `showDetails` state)
+- React mounts a new `TabContent` instance with fresh state
+- Each tab now has independent state, resetting when switching tabs
+
+**Before**: State persists across tabs (likes count, showDetails toggle remain)
+**After**: State resets when switching tabs (each tab starts fresh)
+
+### 🐞 09.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| **Missing key prop on Tab components affects reconciliation** | ⚠️ Identified | `src/components/Tabbed.tsx:17-20` - The `Tab` components don't have explicit `key` props. While React can reconcile them by position (since they're rendered in a fixed order), explicit keys (`key={num}`) would help React identify instances correctly during reconciliation, especially if the tab order ever changes dynamically or if tabs are conditionally rendered. This is a best practice for list-like rendering. |
+| **TabContent state persists across tabs without user control** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - The `TabContent` component maintains its internal state (`likes`, `showDetails`) when switching between tabs because React sees it as the same component instance. Users might expect each tab to have independent state. Adding `key={activeTab}` to `TabContent` would reset state when switching tabs, providing independent state per tab. |
+| **No mechanism to reset TabContent state without key prop** | ⚠️ Identified | `src/components/TabContent.tsx:8-9` - The component's state (`showDetails`, `likes`) can only be reset by unmounting the component. Currently, this only happens when switching to Tab 4 (which renders `DifferentContent`). There's no way to reset state when switching between Tabs 1-3 without using a `key` prop or lifting state up. |
+| **Potential reconciliation issues if tabs are rendered dynamically** | ℹ️ Low Priority | `src/components/Tabbed.tsx:17-20` - If the tabs were refactored to be rendered from an array using `.map()`, missing keys would cause React warnings and potential reconciliation bugs. While current implementation is manual and doesn't require keys, future refactoring should include keys. |
+| **Hardcoded tab rendering prevents using array.map() with keys** | ℹ️ Low Priority | `src/components/Tabbed.tsx:17-20` - Tabs are manually rendered instead of using `.map()` over an array. This prevents demonstrating proper key usage in lists. Refactoring to use `.map()` would allow proper key implementation and demonstrate list rendering best practices. |
+
+### 🧱 09.4 Pending Fixes (TODO)
+
+- [ ] Add explicit `key` props to `Tab` components in `src/components/Tabbed.tsx:17-20` (e.g., `key={num}`) to improve reconciliation clarity and follow React best practices
+- [ ] Add `key={activeTab}` prop to `TabContent` component in `src/components/Tabbed.tsx:23` to reset state when switching between tabs, providing independent state per tab
+- [ ] Consider refactoring tab rendering in `src/components/Tabbed.tsx:17-20` to use `.map()` method with proper keys, demonstrating list rendering best practices: `tabs.map((num) => <Tab key={num} num={num} ... />)`
+- [ ] Add comments explaining the purpose of `key` prop in `src/components/Tabbed.tsx` when implementing keys (both for list reconciliation and state reset)
+- [ ] Test state reset behavior after adding `key={activeTab}` to `TabContent` to ensure state properly resets when switching tabs
+- [ ] Document the difference between state persistence (current behavior) and state reset (with key prop) in component comments or documentation
+
+
 
 
 
@@ -2240,7 +2426,5 @@ We've got different component is rendered in the same position in the tree. It's
 
 ### 🧱 XX.4 Pending Fixes (TODO)
 
-```md
 - [ ]
-```
 
