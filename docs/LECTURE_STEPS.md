@@ -1929,6 +1929,262 @@ When `TabContent`'s `likes` state updates:
 - [ ] Create a comparison component showing diffing with and without keys - Add a `KeyComparisonDemo.tsx` that demonstrates how keys affect React's diffing when list items are reordered
 - [ ] Document diffing performance implications - Add comments explaining how diffing overhead increases with component tree size and how optimization techniques reduce diffing work
 
+<br>
+
+## 🔧 08. Lesson 130 — _Diffing Rules in Practice_
+
+### 🧠 08.1 Context:
+
+**Diffing Rules in Practice** is a practical demonstration lesson that shows how React's diffing algorithm behaves in real-world scenarios. This lesson builds upon the theoretical understanding from Lesson 129 by providing concrete examples of how React preserves or resets component state based on element type and position during reconciliation. Understanding these practical rules is crucial because they directly impact user experience, state management decisions, and component architecture choices.
+
+#### Definition and Purpose
+
+**Diffing Rules in Practice** refers to the observable behavior of React's reconciliation algorithm when components are rendered conditionally or when switching between different component types. The key practical rule is: **React preserves component state when the same element type remains at the same position in the component tree, and resets state when different element types are rendered at the same position.**
+
+**Key Principle**: React's diffing algorithm uses **element type and position** to decide whether to:
+1. **Reuse** a component instance (preserving state) - when element type and position match
+2. **Replace** a component instance (resetting state) - when element type differs at the same position
+
+#### When These Rules Apply
+
+These practical diffing rules manifest in several scenarios:
+
+1. **Conditional Rendering**: When switching between different components based on conditions
+2. **Tab Navigation**: When different tabs show different content components
+3. **Dynamic Component Switching**: When user interactions change which component is rendered
+4. **State Preservation**: When you want state to persist across prop changes
+5. **State Reset**: When you want state to reset when switching contexts
+
+**Example from the Project** (`src/components/Tabbed.tsx`):
+```11:24:src/components/Tabbed.tsx
+function Tabbed({ content }: TabbedProps) {
+  const [activeTab, setActiveTab] = useState(0);
+
+  return (
+    <div>
+      <div className="tabs">
+        <Tab num={0} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={1} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={2} activeTab={activeTab} onClick={setActiveTab} />
+        <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
+      </div>
+
+      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+    </div>
+  );
+}
+```
+
+#### Practical Rule 1: Same Element Type, Same Position = State Preserved
+
+When React encounters the **same element type** at the **same position** in the component tree, it reuses the component instance and preserves all internal state.
+
+**Example from the Project**:
+
+**Scenario**: User hides details and clicks "+" three times in Tab 1, then switches to Tab 2 and Tab 3.
+
+**What Happens**:
+- **Tab 1**: `TabContent` renders with `showDetails: false` and `likes: 3`
+- **Tab 2**: React compares elements at the same position:
+  - Element type: `TabContent` === `TabContent` ✅ (same type)
+  - Position: Same position in tree ✅
+  - **Result**: React **reuses** the `TabContent` instance
+  - **State preserved**: `showDetails: false`, `likes: 3` remain unchanged
+  - Only the `item` prop changes (from `content[0]` to `content[1]`)
+- **Tab 3**: Same behavior - state continues to be preserved
+
+**Code Evidence** (`src/components/TabContent.tsx`):
+```7:9:src/components/TabContent.tsx
+function TabContent({ item }: TabContentProps) {
+  const [showDetails, setShowDetails] = useState(true);
+  const [likes, setLikes] = useState(0);
+```
+
+The `useState` hooks maintain their values across renders because React recognizes `TabContent` as the same component instance at the same position, even though the `item` prop changes.
+
+**Why This Happens**:
+- React's diffing algorithm compares element types first
+- Same type at same position → React updates props and reuses Fiber node
+- Component instance is preserved → State in Fiber tree is preserved
+- Only props are updated → Component re-renders with new props but same state
+
+#### Practical Rule 2: Different Element Type, Same Position = State Reset
+
+When React encounters a **different element type** at the **same position**, it unmounts the old component and mounts a new one, completely resetting state.
+
+**Example from the Project**:
+
+**Scenario**: User interacts with Tab 2 (state: `showDetails: false`, `likes: 3`), then clicks Tab 4.
+
+**What Happens**:
+- **Before (Tab 2)**: `<TabContent item={content[2]} />` is rendered
+- **After (Tab 4)**: `<DifferentContent />` is rendered at the same position
+- React compares elements:
+  - Element type: `TabContent` !== `DifferentContent` ❌ (different type)
+  - Position: Same position in tree ✅
+  - **Result**: React **unmounts** `TabContent` and **mounts** `DifferentContent`
+  - **State lost**: All `TabContent` state (`showDetails`, `likes`) is destroyed
+  - **New instance**: `DifferentContent` is a fresh component with no state
+
+**Code Evidence** (`src/components/Tabbed.tsx`):
+```23:23:src/components/Tabbed.tsx
+{activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+```
+
+When `activeTab` changes from 2 to 3:
+- Conditional expression changes from `true` to `false`
+- React element type changes from `TabContent` to `DifferentContent`
+- React's diffing detects different element types
+- React performs unmount → mount cycle
+
+**When User Returns to Tab 2**:
+- **Before (Tab 4)**: `<DifferentContent />` is rendered
+- **After (Tab 2)**: `<TabContent item={content[2]} />` is rendered
+- React compares elements:
+  - Element type: `DifferentContent` !== `TabContent` ❌ (different type)
+  - **Result**: React unmounts `DifferentContent` and mounts a **new** `TabContent` instance
+  - **State reset**: The new `TabContent` instance starts with default state (`showDetails: true`, `likes: 0`)
+
+**Why This Happens**:
+- React's diffing algorithm treats different element types as incompatible
+- Different type at same position → React destroys old Fiber node and creates new one
+- Component instance is destroyed → All state is lost
+- New component instance → Fresh state initialization
+
+#### Practical Implications
+
+**1. State Preservation Across Prop Changes**:
+
+When the same component type receives different props, state is preserved:
+
+```tsx
+// Tab 1 → Tab 2: State preserved
+<TabContent item={content[0]} />  // showDetails: false, likes: 3
+<TabContent item={content[1]} />  // showDetails: false, likes: 3 (preserved!)
+```
+
+**2. State Reset on Component Type Change**:
+
+When component type changes, state is reset:
+
+```tsx
+// Tab 2 → Tab 4: State lost
+<TabContent item={content[2]} />  // showDetails: false, likes: 3
+<DifferentContent />              // No state (new component)
+
+// Tab 4 → Tab 2: State reset
+<DifferentContent />              // No state
+<TabContent item={content[2]} />  // showDetails: true, likes: 0 (reset!)
+```
+
+**3. Position Matters**:
+
+React compares elements at the same position in the tree. The position is determined by the parent component's render structure:
+
+```tsx
+// Same position in tree
+<div>
+  {condition ? <ComponentA /> : <ComponentB />}  // Position: child[0]
+</div>
+```
+
+#### Advantages
+
+- **Predictable Behavior**: Understanding these rules helps predict when state will be preserved or reset
+- **State Management Clarity**: Makes it clear when to lift state up vs. keeping it local
+- **Performance Optimization**: Reusing component instances is more efficient than creating new ones
+- **User Experience Control**: Allows intentional state preservation or reset based on component structure
+- **Debugging Aid**: Explains why state sometimes persists unexpectedly or resets unexpectedly
+
+#### Disadvantages
+
+- **Unexpected State Persistence**: State can persist when switching between tabs/content, which might not be desired
+- **Unexpected State Loss**: State can be lost when component types change, which can surprise users
+- **Position Dependency**: State preservation depends on component position, which can be fragile
+- **No Fine-Grained Control**: Cannot selectively preserve some state while resetting others without lifting state up
+- **Learning Curve**: Requires understanding of React's reconciliation to predict behavior
+
+#### When to Consider Alternatives
+
+- **Lift State Up**: When you want state to persist across different component types, lift state to a common parent
+- **Single Component with Conditional Content**: Instead of switching component types, use one component with conditional rendering inside
+- **Keys for Lists**: Use keys when rendering lists to control which components are reused
+- **State Management Libraries**: For complex state that needs to persist across component changes, consider Context API or external state management
+- **Component Composition**: Structure components to minimize element type changes when state preservation is important
+
+#### Connection to Main Theme
+
+This lesson demonstrates:
+
+- **Practical Application**: Shows how diffing theory from Lesson 129 works in real code
+- **State Lifecycle**: Explains when component instances are created, reused, or destroyed
+- **User Experience Impact**: Shows how diffing rules directly affect what users see
+- **Architecture Decisions**: Guides when to structure components for state preservation vs. reset
+- **Debugging Knowledge**: Helps understand why state behaves the way it does in practice
+
+**Practical Example from the Project**:
+
+The tabbed interface demonstrates both rules:
+
+1. **State Preservation** (Tabs 1-3): All use `TabContent`, so state persists when switching between them
+2. **State Reset** (Tab 4): Uses `DifferentContent`, so state is lost when switching to/from Tab 4
+
+This practical demonstration makes the abstract concept of diffing concrete and observable, helping developers understand when and why state is preserved or reset in their applications.
+
+### ⚙️ 08.2 Updating code according the context:
+
+#### 08.2.1 Hide the text then click three times on `+` in order to increase the heart amount.
+
+* In tab 1:
+![tab1](../img/section11-lecture130-001.png)
+
+* In tab 2:
+![tab2](../img/section11-lecture130-003.png)
+
+* In tab 3:
+![tab3](../img/section11-lecture130-002.png)
+
+
+> `TabContent` states keep the same through different `Tab` changing:
+- 1 State: false
+- 2 State: 3
+
+> `TabContent` always stays in the exact component position in the tree.
+- its states are precerve across renders
+- The only thing that changes is the `props` that it receives.
+
+#### 08.2.2 What happen when click on `Tab 4`:
+
+![tab4](../img/section11-lecture130-004.png)
+We've got different component is rendered in the same position in the tree. It's no longer `TabContent` but `DifferentContent` component.
+
+> When user goes back and clicks on `Tab 2` for instance:
+![tab2 again](../img/section11-lecture130-005.png)
+`Tab Content` statuses are reset.
+
+### 🐞 08.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| **Typo in comment: "DiffernetContent" should be "DifferentContent"** | ⚠️ Identified | `docs/LECTURE_STEPS.md:1963` - The documentation contains a typo: "DiffernetContent" instead of "DifferentContent". This is a spelling error that should be corrected for clarity and professionalism. |
+| **State preservation behavior may be unexpected for users** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - When users switch between Tabs 1-3, the `TabContent` state (likes count, showDetails toggle) persists across tabs. While this demonstrates diffing rules correctly, it may create unexpected UX where state from one tab appears in another tab. Users might expect each tab to have independent state. This is a design consideration rather than a bug, but worth documenting. |
+| **State reset when switching to Tab 4 may confuse users** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - When users interact with Tabs 1-3 (e.g., hide details, increment likes) and then switch to Tab 4, all state is lost. When they return to Tabs 1-3, the state is reset to defaults. This demonstrates diffing rules (different component types reset state), but users might find this behavior confusing if they expect their interactions to persist. Consider adding user feedback or documentation about this behavior. |
+| **Missing user feedback about state preservation/reset** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - The application doesn't provide any visual indication or explanation to users about why state persists across Tabs 1-3 but resets when switching to Tab 4. While this is intentional for educational purposes, it could benefit from a comment or visual indicator explaining the diffing behavior. |
+| **Hardcoded tab count logic limits extensibility** | ℹ️ Low Priority | `src/components/Tabbed.tsx:23` - The condition `activeTab <= 2` is hardcoded, assuming exactly 3 content tabs (0, 1, 2) and 1 different tab (3). If the `content` array length changes, this logic would need manual updates. A more dynamic approach using `activeTab < content.length` would make the component more flexible. |
+
+### 🧱 08.4 Pending Fixes (TODO)
+
+```md
+- [ ] Fix typo in documentation: Change "DiffernetContent" to "DifferentContent" in `docs/LECTURE_STEPS.md:1963`
+- [ ] Consider adding user feedback mechanism to explain state preservation behavior when switching between Tabs 1-3 (e.g., tooltip or info message explaining that state persists because same component type is used)
+- [ ] Consider adding visual indicator or warning when switching to Tab 4 that explains state will be reset (e.g., "Switching to Tab 4 will reset your current tab's state")
+- [ ] Evaluate if state should be lifted up to `Tabbed` component to provide independent state per tab, or if current behavior (demonstrating diffing rules) is intentional for educational purposes
+- [ ] Refactor hardcoded `activeTab <= 2` condition in `src/components/Tabbed.tsx:23` to use dynamic `activeTab < content.length` for better extensibility
+- [ ] Add comments in `src/components/Tabbed.tsx` explaining the diffing behavior: why state persists across Tabs 1-3 and resets with Tab 4
+- [ ] Consider adding a reset button or clear state functionality to allow users to manually reset tab state if needed
+```
+
+
 
 
 
