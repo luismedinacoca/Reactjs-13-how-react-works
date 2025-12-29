@@ -2535,6 +2535,308 @@ export default Tabbed;
 
 - [ ] **Add unit tests for key prop behavior** - Create tests that verify state resets correctly when the key changes, ensuring the key prop behavior works as expected and doesn't regress in future changes.
 
+<br>
+
+## 🔧 11. Lesson 136 — _State Update Batching in Practice_
+
+### 🧠 11.1 Context:
+
+**State update batching** is React’s behavior of grouping multiple state updates into a single re-render (and commit), instead of rendering after each individual `setState` call. This is fundamental to how React schedules work and why state updates feel “async”: within the same render/event, you’re working with a **snapshot** of state.
+
+In React 18+ (and therefore React 19, which this project uses), **automatic batching** applies not only to React event handlers, but also to many async boundaries (e.g., `setTimeout`, promises, native events), meaning multiple updates inside the same callback are typically rendered together.
+
+**When it happens**
+- Multiple `setState` calls in the same event handler/callback.
+- Multiple `setState` calls inside the same async callback (e.g., a `setTimeout` handler), thanks to automatic batching in React 18+.
+
+**Why it matters**
+- You get **fewer renders** (performance) and **more consistent UI** (no intermediate “half-updated” states).
+- But it can be confusing when you `console.log(state)` right after calling `setState`, because you’ll usually see the **previous** value (the current render’s snapshot), not the upcoming one.
+
+**Examples in this project**
+- **One user action, multiple updates, one render (batched)**: `handleUndo` updates two separate pieces of state (`showDetails` and `likes`) in one click handler (`src/components/TabContent.tsx:21-25`).
+- **Updating based on previous state**: `handleTripleInc` calls `setLikes` three times using the **functional updater** (`src/components/TabContent.tsx:27-41`). This is the correct pattern whenever the next state depends on the previous state.
+- **Batching in async callbacks**: `handleUndoLater` schedules `handleUndo` via `setTimeout` (`src/components/TabContent.tsx:43-45`). In React 18+/19, the updates inside `handleUndo` will still be batched when the timeout fires.
+
+**Rule of thumb**
+- If your next value depends on the current value, always use the **functional updater**:
+  - ✅ `setLikes(l => l + 1)`
+  - ❌ `setLikes(likes + 1)` (can become stale when you queue multiple updates)
+
+**Pros**
+- Fewer renders and DOM commits.
+- Avoids intermediate UI states while updates are in-flight.
+- Predictable update ordering when using functional updaters.
+
+**Cons / gotchas**
+- State reads immediately after `setState` can look “wrong” (stale snapshot).
+- Debugging can be trickier if you expect synchronous updates.
+
+**Alternatives / tools to consider**
+- **`useReducer`** when you have multiple related updates and want a single “transaction-like” update model.
+- **Combine state** when updates are always coupled (careful: don’t over-couple unrelated UI concerns).
+- **`flushSync` (from `react-dom`)** in rare cases where you truly need to force React to flush updates synchronously (use sparingly).
+
+### ⚙️ 11.2 Updating code according the context:
+
+#### 11.2.1 Implement the `undo` button functionality:
+- Verifying the `state` updated is asyncronous.
+```tsx
+/* src/components/TabContent.tsx */
+import { useState } from "react";
+import type { ContentItem } from "../App";
+interface TabContentProps {
+  item: ContentItem | undefined;
+}
+function TabContent({ item }: TabContentProps) {
+  const [showDetails, setShowDetails] = useState(true);
+  const [likes, setLikes] = useState(0);
+  console.log("🚀 RENDERS!");  // 👈🏽 ✅
+  function handleInc() {
+    setLikes((likes) => likes + 1);
+  }
+  if (!item) {
+    return null;
+  }
+  const handleUndo = () => {  // 👈🏽 ✅
+    setShowDetails(true);
+    setLikes(0);
+    console.log("state updated is async", likes);  // 🚀 🔥 ⚠️
+  };
+  return (
+    <div className="tab-content">
+      <h4>{item.summary}</h4>
+      {showDetails && <p>{item.details}</p>}
+      <div className="tab-actions">
+        <button onClick={() => setShowDetails((h) => !h)}>{showDetails ? "Hide" : "Show"} details</button>
+        <div className="hearts-counter">
+          <span>{likes} ❤️</span>
+          <button onClick={handleInc}>+</button>
+          <button>+++</button>
+        </div>
+      </div>
+      <div className="tab-undo">
+        <button onClick={handleUndo}>Undo</button> {/* 👈🏽 ✅ */}
+        <button>Undo in 2s</button>
+      </div>
+    </div>
+  );
+}
+export default TabContent;
+```
+
+- State is updated during the re-rendering
+![updated state in re-rendering](../img/section11-lecture136-001.png)
+
+- Clicking on `undo` button twice it shows different result:
+![undo button](../img/section11-lecture136-002.png)
+
+```
+When you update a component's state with the same value as the current state, React still runs the component once before blocking subsequent renders. This is due to how React works and its reconciliation process.
+
+In case the values ​​are identical, React still performs a reconciliation process to ensure that no side effects have been introduced by this update.
+
+It is important to note that React tries to optimize these cases by avoiding updating the DOM if no difference is detected during reconciliation. This means that although the component rendering has been performed, there will be no actual DOM update.
+
+And in the legacy React documentation:
+
+If your update function returns the exact same value as the current state, the subsequent rerender will be skipped completely.
+```
+
+[legacy reactjs update](https://legacy.reactjs.org/docs/hooks-reference.html#functional-updates)
+
+#### 11.2.2 Implementing the `tripleInc` button
+
+```tsx
+/* src/components/TabContent.tsx */
+import { useState } from "react";
+import type { ContentItem } from "../App";
+interface TabContentProps {
+  item: ContentItem | undefined;
+}
+function TabContent({ item }: TabContentProps) {
+  const [showDetails, setShowDetails] = useState(true);
+  const [likes, setLikes] = useState(0);
+  console.log("🚀 RENDERS!");
+  function handleInc() {
+    setLikes((likes) => likes + 1);
+  }
+  if (!item) {
+    return null;
+  }
+  const handleUndo = () => {
+    setShowDetails(true);
+    setLikes(0);
+    console.log("state updated is async", likes);
+  };
+  function handleTripleInc() {  // 👈🏽 ✅
+    // ❌ If you used the "value form" three times (e.g. setLikes(likes + 1)),
+    // you would queue the same next value multiple times (stale snapshot).
+    //
+    // ✅ Correct: use the functional updater when next state depends on previous state.
+    setLikes((likes) => likes + 1);
+    setLikes((likes) => likes + 1);
+    setLikes((likes) => likes + 1);
+    console.log("state updated is async", likes);  // 👈🏽 ✅
+  }
+  return (
+    <div className="tab-content">
+      <h4>{item.summary}</h4>
+      {showDetails && <p>{item.details}</p>}
+      <div className="tab-actions">
+        <button onClick={() => setShowDetails((h) => !h)}>{showDetails ? "Hide" : "Show"} details</button>
+        <div className="hearts-counter">
+          <span>{likes} ❤️</span>
+          <button onClick={handleInc}>+</button>
+          <button onClick={handleTripleInc}>+++</button>
+        </div>
+      </div>
+      <div className="tab-undo">
+        <button onClick={handleUndo}>Undo</button>
+        <button>Undo in 2s</button>
+      </div>
+    </div>
+  );
+}
+export default TabContent;
+```
+![handleTripleInc with issue](../img/section11-lecture136-003.png)
+
+
+#### 11.2.3 Implementing `callback function` in `handletripleInc` function:
+> Whenever we were ***`updating state`*** based on the ***`current state`***, we would use a ***`callback function`*** instead of just a value.
+
+```tsx
+/* src/components/TabContent.tsx */
+import { useState } from "react";
+import type { ContentItem } from "../App";
+interface TabContentProps {
+  item: ContentItem | undefined;
+}
+function TabContent({ item }: TabContentProps) {
+  const [showDetails, setShowDetails] = useState(true);
+  const [likes, setLikes] = useState(0);
+  console.log("🚀 RENDERS!");
+  function handleInc() {
+    setLikes(likes + 1);
+  }
+  if (!item) {
+    return null;
+  }
+  const handleUndo = () => {
+    setShowDetails(true);
+    setLikes(0);
+    console.log("state updated is async", likes);
+  };
+  function handleTripleInc() {
+    //setLikes(likes + 1);
+    //setLikes(likes + 1);
+    //setLikes(likes + 1);
+    // handleInc();
+    // handleInc();
+    // handleInc();
+    setLikes((likes) => likes + 1);     // 👈🏽 ✅
+    setLikes((likes) => likes + 1);     // 👈🏽 ✅
+    setLikes((likes) => likes + 1);     // 👈🏽 ✅
+    console.log("state updated is async", likes);
+  }
+  return (
+    <div className="tab-content">
+      <h4>{item.summary}</h4>
+      {showDetails && <p>{item.details}</p>}
+      <div className="tab-actions">
+        <button onClick={() => setShowDetails((h) => !h)}>{showDetails ? "Hide" : "Show"} details</button>
+        <div className="hearts-counter">
+          <span>{likes} ❤️</span>
+          <button onClick={handleInc}>+</button>
+          <button onClick={handleTripleInc}>+++</button>
+        </div>
+      </div>
+      <div className="tab-undo">
+        <button onClick={handleUndo}>Undo</button>
+        <button>Undo in 2s</button>
+      </div>
+    </div>
+  );
+}
+export default TabContent;
+```
+
+![implementing handleTripleInc](../img/section11-lecture136-004.png)
+
+#### 11.2.4 Implementing `setTimeout` of 2000 ms 
+
+```tsx
+/* src/components/TabContent.tsx */
+import { useState } from "react";
+import type { ContentItem } from "../App";
+interface TabContentProps {
+  item: ContentItem | undefined;
+}
+function TabContent({ item }: TabContentProps) {
+  const [showDetails, setShowDetails] = useState(true);
+  const [likes, setLikes] = useState(0);
+  console.log("🚀 RENDERS!");
+  function handleInc() {
+    setLikes((likes) => likes + 1);
+  }
+  if (!item) {
+    return null;
+  }
+  const handleUndo = () => {
+    setShowDetails(true);
+    setLikes(0);
+    console.log("state updated is async", likes);
+  };
+  function handleTripleInc() {
+    setLikes((likes) => likes + 1);
+    setLikes((likes) => likes + 1);
+    setLikes((likes) => likes + 1);
+    console.log("state updated is async", likes);
+  }
+  const handleUndoLater = () => {     // 👈🏽 ✅
+    setTimeout(handleUndo, 2000);
+  };
+  return (
+    <div className="tab-content">
+      <h4>{item.summary}</h4>
+      {showDetails && <p>{item.details}</p>}
+      <div className="tab-actions">
+        <button onClick={() => setShowDetails((h) => !h)}>{showDetails ? "Hide" : "Show"} details</button>
+        <div className="hearts-counter">
+          <span>{likes} ❤️</span>
+          <button onClick={handleInc}>+</button>
+          <button onClick={handleTripleInc}>+++</button>
+        </div>
+      </div>
+      <div className="tab-undo">
+        <button onClick={handleUndo}>Undo</button>
+        <button onClick={handleUndoLater}>Undo in 2s</button> {/* 👈🏽 ✅ */}
+      </div>
+    </div>
+  );
+}
+export default TabContent;
+```
+![with setTimeout](../img/section11-lecture136-005.png)
+
+### 🐞 11.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| Lesson context was missing | ✅ Fixed | `docs/LECTURE_STEPS.md:2542` was empty, making the lesson harder to understand without reading screenshots/snippets. |
+| Docs snippet drift vs current implementation | ✅ Fixed | The docs showed `setLikes(likes + 1)` while the current code uses the functional updater (`src/components/TabContent.tsx:13-15`). Updated examples to match the repo and clarified “bad vs good” patterns. |
+| Duplicate subsection numbering + placeholder snippet header | ✅ Fixed | `11.2.3` appeared twice and one snippet had a placeholder comment (`/* */`). Renumbered to `11.2.4` and corrected snippet header. |
+| “State updated is async” logs can be misleading without explanation | ⚠️ Identified | `console.log(..., likes)` right after `setLikes(...)` logs the **previous** value because state updates are queued and the current render holds a snapshot (`src/components/TabContent.tsx:21-25` and `27-41`). |
+| Potential confusion around async batching/closures with `setTimeout(handleUndo, 2000)` | ℹ️ Low Priority | In React 19, updates inside the timeout callback are still batched, but the captured values inside closures may surprise readers. Consider adding an explicit note/comment near `handleUndoLater` (`src/components/TabContent.tsx:43-45`). |
+
+### 🧱 11.4 Pending Fixes (TODO)
+
+- [ ] **Add a short inline explanation about “stale state snapshot” near the logs** in `src/components/TabContent.tsx:21-25` and `src/components/TabContent.tsx:40-41` so it’s explicit that logging `likes` right after `setLikes` prints the previous value.
+- [ ] **Optionally add a `useEffect` debug logger** in `src/components/TabContent.tsx` to show the “after render” value (e.g., `useEffect(() => console.log("likes changed", likes), [likes])`) and compare it to the in-handler logs.
+- [ ] **Add a short comment near `handleUndoLater`** in `src/components/TabContent.tsx:43-45` explaining that React 18+/19 batches updates even in `setTimeout` callbacks, and that closures capture values from the render that created them.
+
+
 
 
 
