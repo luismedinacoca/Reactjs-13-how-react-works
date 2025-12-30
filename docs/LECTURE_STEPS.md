@@ -2837,6 +2837,74 @@ export default TabContent;
 - [ ] **Add a short comment near `handleUndoLater`** in `src/components/TabContent.tsx:43-45` explaining that React 18+/19 batches updates even in `setTimeout` callbacks, and that closures capture values from the render that created them.
 
 
+<br>
+
+## 🔧 12. Lesson 137 — _How Events work in React_
+
+### 🧠 12.1 Context:
+
+In React, **events** are how the UI reacts to user interactions (clicks, typing, submitting forms, pointer interactions, etc.). Instead of attaching listeners directly via `addEventListener`, React exposes **event props** like `onClick`, `onChange`, `onSubmit`, etc., and wires them up internally.
+
+At the DOM level, most events follow **event propagation**:
+- **Capture phase**: the event travels from the root down to the target (`onClickCapture` in React).
+- **Target phase**: the event reaches the target element.
+- **Bubble phase**: the event bubbles back up (`onClick` in React listens to the bubble phase by default).
+
+React primarily relies on **event delegation**, meaning it registers a small number of listeners at the root container and dispatches events to the correct component handlers. React also wraps browser events into a **SyntheticEvent** API (a normalized wrapper) so that handler code feels consistent across browsers and event types.
+
+**How this shows up in this project**
+- `src/components/Tab.tsx`: a `<button>` uses `onClick` to notify the parent which tab was selected. The handler is a closure (`() => onClick(num)`) that “injects” data (`num`) into the callback.
+- `src/components/Tabbed.tsx`: the parent passes `setActiveTab` down as a callback prop, so a click triggers a state update and a re-render.
+- `src/components/TabContent.tsx`: multiple `<button>` elements trigger state updates via event handlers (e.g. increment likes, toggle details, undo).
+
+**Advantages**
+- **Consistent API** across browsers and event types (SyntheticEvent).
+- **Delegation** reduces the number of DOM listeners and simplifies cleanup.
+- **Ergonomic composition**: events flow “up” through callbacks, while data flows “down” through props.
+
+**Disadvantages / gotchas**
+- The abstraction can hide some native details (e.g. `event.target` vs `event.currentTarget`, capture vs bubble).
+- It’s easy to overuse **inline handlers** (`onClick={() => ...}`), which recreates functions every render and can make debugging/profiling noisier (usually fine, but worth recognizing).
+- React’s event system is not the same as calling `addEventListener` manually; for non-React-managed DOM nodes (or global listeners like `window`), you still need native listeners (often via `useEffect`).
+
+**When to consider alternatives**
+- Use native `addEventListener` (inside `useEffect`) for **global events** (`resize`, `scroll`, `keydown` on `window/document`) or for DOM nodes created outside React.
+- Use pointer events (`onPointerDown`, etc.) when you need a unified mouse/touch/stylus model.
+
+### ⚙️ 12.2 Updating code according the context:
+
+#### 12.2.1 **DOM REFRESHER**: Event Propagation and Delegation
+
+![Event Propagation and Delegation](../img/section11-lecture137-001.png)
+
+
+#### 12.2.2 How **React** handles events
+
+![How React handles events](../img/section11-lecture137-002.png)
+
+
+#### 12.2.3 **Synthetic** Events:
+
+![Synthetic Events](../img/section11-lecture137-003.png)
+
+
+### 🐞 12.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| Lesson context was missing | ✅ Fixed | `docs/LECTURE_STEPS.md` Lesson 12 had an empty **12.1 Context**, leaving screenshots without explanation (propagation, delegation, SyntheticEvent, and how the repo uses handlers). |
+| “Callback prop” named `onClick` can be misleading | ℹ️ Low Priority | In `src/components/Tab.tsx`, `onClick` is **not** a DOM event handler but a callback prop. Consider renaming to `onSelectTab` to avoid confusing “React event prop” vs “user-defined callback”. |
+| Inline arrow handlers hide the event object and recreate functions | ℹ️ Low Priority | `src/components/Tab.tsx:9` uses `onClick={() => onClick(num)}` and `src/components/TabContent.tsx:53` uses `onClick={() => setShowDetails(...)}`. This is fine, but it makes it harder to demonstrate `(event) => ...` usage (and creates a new function each render). |
+| No concrete example in the repo for propagation control (`stopPropagation`, capture) | ⚠️ Identified | Lesson 12 discusses propagation/delegation and SyntheticEvent, but the current codebase doesn’t include an explicit demo of bubbling/capture or `event.stopPropagation()`/`event.preventDefault()`. This makes the lesson harder to verify hands-on. |
+
+### 🧱 12.4 Pending Fixes (TODO)
+
+- [ ] **Add a small “EventPropagationDemo” component** (e.g. `src/components/EventPropagationDemo.tsx`) that renders nested clickable elements and logs capture vs bubble, plus a toggle to call `event.stopPropagation()`. Wire it into `src/App.tsx` temporarily for learning.
+- [ ] **Demonstrate using the event object in a handler** (e.g. `const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => { ... }`) so the lesson has at least one concrete, typed SyntheticEvent example.
+- [ ] **(Optional) Rename `Tab` callback prop for clarity**: change `onClick` → `onSelectTab` in `src/components/Tab.tsx` and update usages in `src/components/Tabbed.tsx` to clearly separate “React event props” from “custom callback props”.
+- [ ] **(Optional) Replace inline arrow handlers with named handlers** in `src/components/Tab.tsx` and the toggle button in `src/components/TabContent.tsx` to make the event-handling code easier to read/teach and easier to extend with `event` logic later.
+
+
 
 
 
