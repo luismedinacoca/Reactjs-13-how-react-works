@@ -11,6 +11,8 @@ interface TabbedProps {
 function Tabbed({ content }: TabbedProps) {
   const [activeTab, setActiveTab] = useState(0);
 
+  const currentItem = activeTab <= 2 ? content.at(activeTab) : undefined;
+
   return (
     <div>
       <div className="tabs">
@@ -20,7 +22,13 @@ function Tabbed({ content }: TabbedProps) {
         <Tab num={3} activeTab={activeTab} onClick={setActiveTab} />
       </div>
 
-      {activeTab <= 2 ? <TabContent item={content.at(activeTab)} /> : <DifferentContent />}
+      {activeTab <= 2 ? (
+        currentItem ? (
+          <TabContent item={currentItem} key={currentItem.summary} />
+        ) : null
+      ) : (
+        <DifferentContent />
+      )}
     </div>
   );
 }
