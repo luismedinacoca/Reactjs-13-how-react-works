@@ -1,12 +1,154 @@
-# ⚙️ Section #11: `How React works behind the scenes`
+# 👨🏾‍💻 Section #11: How React Works Behind the Scenes (React + TypeScript)
 
----
+This document is an educational, lecture-by-lecture guide for **How React Works Behind the Scenes** using a small **React + TypeScript** sandbox app (Vite). It focuses on **rendering**, **reconciliation**, **diffing**, **keys**, **state updates & batching**, and **events**.
 
+<a id="project-overview"></a>
+## 📋 Project Overview
+
+### What This Project Does
+
+- **Tabbed UI sandbox** to observe how React behaves during UI updates.
+- **Demonstrates re-renders** via explicit logs (`console.log("🚀 RENDERS!")`).
+- **Shows state update patterns** (single update, multiple updates, and functional updates).
+- **Highlights remount/state reset** through:
+  - `key` changes (forced remount)
+  - switching to a different component tree (Tab 4 → `DifferentContent`)
+
+### Technology Stack
+
+- **React** + **React DOM**
+- **TypeScript**
+- **Vite**
+- **ESLint**
+
+### Key Components
+
+- `src/main.tsx`: mounts the React app (Strict Mode enabled for dev).
+- `src/App.tsx`: defines the `content` model and renders `Tabbed`.
+- `src/components/Tabbed.tsx`: holds `activeTab` state and chooses what to render.
+- `src/components/Tab.tsx`: tab button (presentational + callback prop).
+- `src/components/TabContent.tsx`: local state (`showDetails`, `likes`) + state update demos.
+- `src/components/DifferentContent.tsx`: different component type to demonstrate remount/reset.
+
+<a id="table-of-contents"></a>
 ## 📑 Table of Contents
 
----
+- [📋 Project Overview](#project-overview)
+- [🌳 Visual Project Tree](#visual-project-tree)
+- [📋 Project Overview (Detailed)](#project-overview-detailed)
+- [🧳 Section #11: How React works behind the scenes](#section-11)
+  - [📚 Lecture 123: Project Setup and Walkthrough](#lesson-123)
+    - [🧠 01.1 Context](#lesson-123-context)
+    - [⚙️ 01.2 Updating code according the context](#lesson-123-code)
+    - [🧱 01.3 Pending Fixes (TODO)](#lesson-123-todo)
+  - [📚 Lecture 124: Components, Instances, and Elements](#lesson-124)
+    - [🧠 02.1 Context](#lesson-124-context)
+    - [⚙️ 02.2 Updating code according the context](#lesson-124-code)
+    - [🧱 02.3 Pending Fixes (TODO)](#lesson-124-todo)
+  - [📚 Lecture 125: Instances and Elements in Practice](#lesson-125)
+    - [🧠 03.1 Context](#lesson-125-context)
+    - [⚙️ 03.2 Updating code according the context](#lesson-125-code)
+    - [🧱 03.3 Pending Fixes (TODO)](#lesson-125-todo)
+  - [📚 Lecture 126: How Rendering Works — Overview](#lesson-126)
+    - [🧠 04.1 Context](#lesson-126-context)
+    - [⚙️ 04.2 Updating section](#lesson-126-code)
+    - [🧱 04.3 Pending Fixes (TODO)](#lesson-126-todo)
+  - [📚 Lecture 127: How Rendering Works — The Render Phase](#lesson-127)
+    - [🧠 05.1 Context](#lesson-127-context)
+    - [⚙️ 05.2 Updating code according the context](#lesson-127-code)
+    - [🧱 05.3 Pending Fixes (TODO)](#lesson-127-todo)
+  - [📚 Lecture 128: How Rendering Works — The Commit Phase](#lesson-128)
+    - [🧠 06.1 Context](#lesson-128-context)
+    - [⚙️ 06.2 Updating code according the context](#lesson-128-code)
+    - [🧱 06.3 Pending Fixes (TODO)](#lesson-128-todo)
+  - [📚 Lecture 129: How Diffing Works](#lesson-129)
+    - [🧠 07.1 Context](#lesson-129-context)
+    - [⚙️ 07.2 Updating code according the context](#lesson-129-code)
+    - [🧱 07.3 Pending Fixes (TODO)](#lesson-129-todo)
+  - [📚 Lecture 130: Diffing Rules in Practice](#lesson-130)
+    - [🧠 08.1 Context](#lesson-130-context)
+    - [⚙️ 08.2 Updating code according the context](#lesson-130-code)
+    - [🧱 08.3 Pending Fixes (TODO)](#lesson-130-todo)
+  - [📚 Lecture 131: The Key Prop](#lesson-131)
+    - [🧠 09.1 Context](#lesson-131-context)
+    - [⚙️ 09.2 Updating code according the context](#lesson-131-code)
+    - [🧱 09.3 Pending Fixes (TODO)](#lesson-131-todo)
+  - [📚 Lecture 132: Resetting State With the Key Prop](#lesson-132)
+    - [🧠 10.1 Context](#lesson-132-context)
+    - [⚙️ 10.2 Updating code according the context](#lesson-132-code)
+    - [🧱 10.3 Pending Fixes (TODO)](#lesson-132-todo)
+  - [📚 Lecture 136: State Update Batching in Practice](#lesson-136)
+    - [🧠 11.1 Context](#lesson-136-context)
+    - [⚙️ 11.2 Updating code according the context](#lesson-136-code)
+    - [🧱 11.3 Pending Fixes (TODO)](#lesson-136-todo)
+  - [📚 Lecture 137: How Events Work in React](#lesson-137)
+    - [🧠 12.1 Context](#lesson-137-context)
+    - [⚙️ 12.2 Updating code according the context](#lesson-137-code)
+    - [🧱 12.3 Pending Fixes (TODO)](#lesson-137-todo)
+  - [📚 Lecture 138: Libraries vs. Frameworks & The React Ecosystem](#lesson-138)
+    - [🧠 13.1 Context](#lesson-138-context)
+    - [⚙️ 13.2 Updating code according the context](#lesson-138-code)
+    - [🧱 13.3 Pending Fixes (TODO)](#lesson-138-todo)
+  - [📚 Lecture 139: Section Summary — Practical Takeaways](#lesson-139)
+    - [🧠 14.1 Context](#lesson-139-context)
+    - [⚙️ 14.2 Updating code according the context](#lesson-139-code)
+    - [🧱 14.3 Pending Fixes (TODO)](#lesson-139-todo)
+
+<a id="visual-project-tree"></a>
+## 🌳 Visual Project Tree
+
+```text
+📁 ./
+├─ 📁 docs/                         # 📚 Learning notes and lecture-by-lecture documentation
+│  └─ 📄 LECTURE_STEPS.md            # This file (the learning narrative)
+├─ 📁 img/                          # 🖼️ Screenshots referenced by lessons
+├─ 📁 public/                       # Static assets (Vite public dir)
+├─ 📁 src/                          # React + TS source code
+│  ├─ 📁 components/
+│  │  ├─ 📄 DifferentContent.tsx     # Different component tree to demonstrate remount/reset
+│  │  ├─ 📄 Tab.tsx                  # Tab button
+│  │  ├─ 📄 Tabbed.tsx               # Tab container + active tab state
+│  │  └─ 📄 TabContent.tsx           # Local state + state update demos
+│  ├─ 📄 App.tsx                     # Root component + content model
+│  ├─ 📄 index.css                   # Global styles
+│  └─ 📄 main.tsx                    # React bootstrap (createRoot + StrictMode)
+├─ 📄 package.json                   # Scripts and dependencies
+├─ 📄 vite.config.ts                 # Vite configuration
+└─ 📄 eslint.config.js               # Lint rules
+```
+
+<a id="project-overview-detailed"></a>
+## 📋 Project Overview (Detailed)
+
+### Purpose
+
+This project exists to make React’s “invisible” runtime behavior **observable**:
+
+- **Rendering**: when/why React re-renders, what a render means, and what *doesn’t* happen during a render.
+- **Reconciliation**: how React compares trees and decides what to update.
+- **Commit**: when React mutates the DOM and when the browser paints.
+- **Diffing rules**: why element type, position, and `key` matter.
+- **State updates**: why updates are queued/batched, and why functional updates are required for multiple increments.
+- **Remounting**: how `key` and component type changes reset local state.
+
+### Core Learning Scenarios in This Repo
+
+- Switching tabs demonstrates **re-render vs remount** behavior.
+- Increment buttons demonstrate **state batching** and the need for **functional updates**.
+- Undo actions demonstrate **immediate vs delayed** (via `setTimeout`) updates.
+- Tab 4 demonstrates **different component type → remount → state reset**.
+
+<a id="section-11"></a>
+## 🧳 Section #11: How React works behind the scenes
+
+<br>
+
+<a id="lesson-123"></a>
+### 📚 Lecture 123: Project Setup and Walkthrough
 
 ## 🔧 01. Lesson 123 — _Project Setup and Walkthrough_
+
+<a id="lesson-123-context"></a>
 
 ### 🧠 01.1 Context:
 
@@ -77,6 +219,7 @@ This setup is crucial because it sets the stage for exploring:
 - Component lifecycle and side effects
 - Performance optimizations and re-rendering
 
+<a id="lesson-123-code"></a>
 ### ⚙️ 01.2 Updating code according the context:
 
 #### 01.2.1 Initial setup:
@@ -282,7 +425,7 @@ This setup is crucial because it sets the stage for exploring:
         └── 📄 DifferentContent.tsx # Alternative content component
 ```
 
-### 🐞 01.3 Issues:
+### 🐞 01.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -295,7 +438,8 @@ This setup is crucial because it sets the stage for exploring:
 | **Inconsistency in function names** | ℹ️ Low Priority | `src/components/TabContent.tsx:11` - The `handleInc` function follows the correct pattern, but other handlers use inline functions. It would be better to maintain consistency using named functions with the `handle` prefix. |
 | **Missing strict TypeScript in some places** | ℹ️ Low Priority | `src/components/Tabbed.tsx:23` - The use of `content.at()` returns `ContentItem | undefined`, but TypeScript could benefit from more explicit type guards. |
 
-### 🧱 01.4 Pending Fixes (TODO)
+<a id="lesson-123-todo"></a>
+### 🧱 01.3 Pending Fixes (TODO)
 
 - [ ] Implement functionality for the "+++" button in `TabContent.tsx` (line 30) - should increment likes by 3
 - [ ] Implement functionality for the "Undo" button in `TabContent.tsx` (line 35) - should revert the last likes change
@@ -311,8 +455,12 @@ This setup is crucial because it sets the stage for exploring:
 
 <br>
 
+<a id="lesson-124"></a>
+### 📚 Lecture 124: Components, Instances, and Elements
+
 ## 🔧 02. Lesson 124 — _Components, Instances, and Elements_
 
+<a id="lesson-124-context"></a>
 ### 🧠 02.1 Context:
 
 **Components, Instances, and Elements** is a fundamental lesson that explains the core concepts of React's internal architecture. Understanding these concepts is crucial for developers because they form the foundation of how React works behind the scenes.
@@ -430,19 +578,20 @@ This lesson is foundational because it explains:
 - **Why state resets**: When switching from `<TabContent />` to `<DifferentContent />`, React creates a new Instance because the component type changed
 - **Performance optimization**: Understanding React Elements helps optimize re-renders and use React.memo effectively
 
+<a id="lesson-124-code"></a>
 ### ⚙️ 02.2 Updating code according the context:
 
 #### 02.2.1 Component:
-![](../img/section11-lecture124-001.png)
+![component](../img/section11-lecture124-001.png)
 
 #### 02.2.2 Component vs Instance:
-![](../img/section11-lecture124-002.png)
+![component vs instance](../img/section11-lecture124-002.png)
 
 #### 02.2.3 Component vs Instance vs React Element:
-![](../img/section11-lecture124-003.png)
+![Component vs Instance vs React Element](../img/section11-lecture124-003.png)
 
 #### 02.2.4 Component vs Instance vs React Element vs DOM Element (HTML):
-![](../img/section11-lecture124-004.png)
+![Component vs Instance vs React Element vs DOM Element ](../img/section11-lecture124-004.png)
 
 #### 02.2.5 Comparative table:
 
@@ -466,7 +615,7 @@ This lesson is foundational because it explains:
 | **Key Features**       | - Reusable<br>- Uses Hooks for state/effects<br>- Pure functions (ideally) | N/A                                                                                | - Lightweight<br>- Describes "what" to render<br>- Core unit of Virtual DOM                      | - Consumes browser memory/CPU<br>- Visible to user<br>- Final render output               |
 | **Use in React**       | Primary building block in modern React (functional + Hooks paradigm).      | Obsolete concept for functional components; React treats them as plain functions.   | Central to React’s rendering model—used for diffing and scheduling updates.                      | Final target of rendering; updated efficiently via React’s reconciliation.               |
 
-### 🐞 02.3 Issues:
+### 🐞 02.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -478,7 +627,8 @@ This lesson is foundational because it explains:
 | **onClick prop passed directly without memoization** | ⚠️ Identified | `src/components/Tabbed.tsx:17-20` - The `setActiveTab` function is passed directly to each `Tab` instance. While this works, if `Tab` were memoized, a new function reference on each render would cause unnecessary re-renders. Using `useCallback` would optimize this. |
 | **No demonstration of React Element structure in code** | ℹ️ Low Priority | The project doesn't include code examples showing what React Elements look like when logged (e.g., `console.log(<Tab num={0} />)`), which would help developers visualize the concept discussed in the lesson. |
 
-### 🧱 02.4 Pending Fixes (TODO)
+<a id="lesson-124-todo"></a>
+### 🧱 02.3 Pending Fixes (TODO)
 
 - [ ] Add explicit `key` props to `Tab` component instances in `Tabbed.tsx` (lines 17-20) - Use `key={num}` to help React identify instances correctly
 - [ ] Add `React.memo` to `Tab.tsx` component to prevent unnecessary re-renders when props haven't changed
@@ -496,8 +646,12 @@ This lesson is foundational because it explains:
 <br>
 
 
+<a id="lesson-125"></a>
+### 📚 Lecture 125: Instances and Elements in Practice
+
 ## 🔧 03. Lesson 125 — _Instances and Elements in Practice_
 
+<a id="lesson-125-context"></a>
 ### 🧠 03.1 Context:
 
 **Instances and Elements in Practice** is a practical lesson that demonstrates the critical difference between using JSX syntax to create React Elements versus calling component functions directly. This lesson is essential because it reveals how React's internal mechanisms work and why certain patterns break React's state management and reconciliation.
@@ -628,6 +782,7 @@ Understanding these concepts helps developers:
 - Appreciate React's internal architecture
 - Write more predictable and maintainable code
 
+<a id="lesson-125-code"></a>
 ### ⚙️ 03.2 Updating code according the context:
 
 #### 03.2.1 Using a component instance:
@@ -732,7 +887,7 @@ export default Tabbed;
 ![instance inside another component](../img/section11-lecture125-004.png)
 
 
-### 🐞 03.3 Issues:
+### 🐞 03.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -745,7 +900,8 @@ export default Tabbed;
 | **Missing practical demonstration of state loss** | ⚠️ Identified | The lesson explains that direct calls break state management but doesn't include a practical example showing how `TabContent`'s `likes` and `showDetails` state would reset on every render if called directly. A working example would make the concept clearer. |
 | **Security implications of missing $$typeof not emphasized** | ℹ️ Low Priority | While the lesson mentions `$$typeof` as a security feature, it doesn't emphasize the XSS attack vector that this prevents. The documentation could better explain why this matters in production applications. |
 
-### 🧱 03.4 Pending Fixes (TODO)
+<a id="lesson-125-todo"></a>
+### 🧱 03.3 Pending Fixes (TODO)
 
 - [ ] Remove or clearly mark debug `console.log` statements in documentation examples (`docs/LECTURE_STEPS.md:651,685`) - Add comments indicating these are for educational purposes only and should not be used in production code
 - [ ] Fix invalid prop example in documentation (`docs/LECTURE_STEPS.md:651`) - Either update `DifferentContent` component to accept props or change the example to use a component that actually accepts props (like `TabContent`)
@@ -762,8 +918,12 @@ export default Tabbed;
 <br>
 
 
+<a id="lesson-126"></a>
+### 📚 Lecture 126: How Rendering Works — Overview
+
 ## 🔧 04. Lesson 126 — _How Rendenring works - Overview_
 
+<a id="lesson-126-context"></a>
 ### 🧠 04.1 Context:
 
 **How Rendering Works - Overview** is a foundational lesson that explains React's rendering process, from initial mount to subsequent updates. Understanding rendering is crucial because it forms the basis for performance optimization, debugging, and writing efficient React applications.
@@ -945,18 +1105,19 @@ This lesson is essential because it explains:
 - **Debugging**: Knowing render triggers helps identify why components re-render unexpectedly
 - **Best Practices**: Understanding renders guides when to lift state, use Context, or optimize components
 
+<a id="lesson-126-code"></a>
 ### ⚙️ 04.2 Updating section:
 
 #### 04.2.1 Quick **RECAP** before we get started:
-![](../img/section11-lecture126-001.png)
+![recap](../img/section11-lecture126-001.png)
 
 #### 04.2.2 How Components are **DISPLAYED** on the screen:
-![](../img/section11-lecture126-002.png)
+![component displayed on screen](../img/section11-lecture126-002.png)
 
 #### 04.2.3 How renders are **TRIGGERED**
-![](../img/section11-lecture126-003.png)
+![renders are triggered](../img/section11-lecture126-003.png)
 
-### 🐞 04.3 Issues:
+### 🐞 04.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -969,7 +1130,8 @@ This lesson is essential because it explains:
 | **No render performance monitoring** | ℹ️ Low Priority | The project doesn't include any render tracking or performance monitoring (e.g., `why-did-you-render`, React DevTools Profiler usage examples). This makes it difficult to identify unnecessary re-renders and optimize performance. |
 | **Missing explanation of render batching** | ℹ️ Low Priority | The code examples don't demonstrate React's automatic batching behavior (React 18+). For example, if multiple state updates occurred in quick succession, understanding batching would help developers write more efficient code. |
 
-### 🧱 04.4 Pending Fixes (TODO)
+<a id="lesson-126-todo"></a>
+### 🧱 04.3 Pending Fixes (TODO)
 
 - [ ] Add `React.memo` to `Tab.tsx` component to prevent unnecessary re-renders when props haven't changed (`src/components/Tab.tsx:7`)
 - [ ] Wrap `setActiveTab` in `useCallback` in `Tabbed.tsx` to provide stable function reference for memoized `Tab` components (`src/components/Tabbed.tsx:12`)
@@ -985,8 +1147,12 @@ This lesson is essential because it explains:
 <br>
 
 
+<a id="lesson-127"></a>
+### 📚 Lecture 127: How Rendering Works — The Render Phase
+
 ## 🔧 05. Lesson 127 — _How Rendenring works - The Render Phase_
 
+<a id="lesson-127-context"></a>
 ### 🧠 05.1 Context:
 
 **How Rendering Works - The Render Phase** is a deep dive into React's internal rendering mechanism, specifically focusing on the Render Phase where React processes component updates, builds the Virtual DOM, and performs reconciliation. Understanding the Render Phase is crucial because it explains how React efficiently updates the UI without directly manipulating the DOM, and why certain optimization techniques work.
@@ -1198,6 +1364,7 @@ When `TabContent`'s `likes` state updates:
 5. **Commit Phase**: Updates only the `<span>` DOM node's text content
 6. **Result**: Only the likes counter updates, not the entire component or parent components
 
+<a id="lesson-127-code"></a>
 ### ⚙️ 05.2 Updating code according the context:
 
 #### 05.2.1 Review: The mechanics of State in React:
@@ -1272,7 +1439,7 @@ When `TabContent`'s `likes` state updates:
 ![The Render phase](../img/section11-lecture127-009.png)
 
 
-### 🐞 05.3 Issues:
+### 🐞 05.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -1289,7 +1456,8 @@ When `TabContent`'s `likes` state updates:
 | **Virtual DOM recreation not optimized** | ⚠️ Identified | Every render creates a completely new Virtual DOM tree, even for components whose props haven't changed. While React optimizes this through reconciliation, the initial Virtual DOM creation still happens for all components. `React.memo` would prevent unnecessary Virtual DOM node creation. |
 | **Conditional rendering causes Fiber tree restructuring** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - Switching between `<TabContent />` and `<DifferentContent />` causes React to unmount one Fiber and mount another. This is expected behavior but causes the entire component subtree to be recreated in the Fiber tree, losing state and triggering full reconciliation. |
 
-### 🧱 05.4 Pending Fixes (TODO)
+<a id="lesson-127-todo"></a>
+### 🧱 05.3 Pending Fixes (TODO)
 
 - [ ] Add `React.memo` to `Tab.tsx` component to prevent unnecessary re-renders and Virtual DOM creation when props haven't changed (`src/components/Tab.tsx:7`)
 - [ ] Add `React.memo` to `TabContent.tsx` component with custom comparison function to prevent re-renders when `item` prop reference is the same (`src/components/TabContent.tsx:7`)
@@ -1309,8 +1477,12 @@ When `TabContent`'s `likes` state updates:
 
 <br>
 
+<a id="lesson-128"></a>
+### 📚 Lecture 128: How Rendering Works — The Commit Phase
+
 ## 🔧 06. Lesson 128 — _How Rendering Works: The Commit Phase_
 
+<a id="lesson-128-context"></a>
 ### 🧠 06.1 Context:
 
 **How Rendering Works: The Commit Phase** is a crucial lesson that explains the final step of React's rendering cycle, where React applies changes to the actual DOM and executes side effects. Understanding the Commit Phase is essential because it explains when and how users see updates on screen, when side effects run, and why certain operations must be synchronous.
@@ -1512,6 +1684,7 @@ When switching from Tab 0 to Tab 1:
 3. **Browser Paint**: User sees Tab 1 highlighted and new content
 4. **After Commit**: If `TabContent` had `useEffect` hooks, they would run now
 
+<a id="lesson-128-code"></a>
 ### ⚙️ 06.2 Updating code according the context:
 
 #### 06.2.1 **Commit** phase and browser **paint**
@@ -1523,7 +1696,7 @@ When switching from Tab 0 to Tab 1:
 #### 06.2.2 **RECAP**: Putting it all together:
 ![Recap](../img/section11-lecture128-003.png)
 
-### 🐞 06.3 Issues:
+### 🐞 06.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -1538,7 +1711,8 @@ When switching from Tab 0 to Tab 1:
 | **Missing examples of batching multiple state updates in single commit** | ℹ️ Low Priority | The project doesn't demonstrate how React batches multiple state updates into a single Commit Phase. For example, if multiple `setLikes` calls happened quickly, they would be batched, but this isn't demonstrated or explained. |
 | **No demonstration of commit phase vs render phase separation** | ⚠️ Identified | The code doesn't include comments or examples clearly separating Render Phase work (creating React Elements) from Commit Phase work (updating DOM). Adding explicit examples would help developers understand the distinction. |
 
-### 🧱 06.4 Pending Fixes (TODO)
+<a id="lesson-128-todo"></a>
+### 🧱 06.3 Pending Fixes (TODO)
 
 - [ ] Add `useEffect` hook to `TabContent.tsx` to demonstrate Commit Phase timing - Add an effect that logs when it runs, showing it executes after DOM updates during Commit Phase (`src/components/TabContent.tsx`)
 - [ ] Add `useLayoutEffect` example for DOM measurements - Create a demonstration showing `useLayoutEffect` running synchronously during Commit Phase's Layout sub-phase, before browser paint
@@ -1556,8 +1730,12 @@ When switching from Tab 0 to Tab 1:
 
 <br>
 
+<a id="lesson-129"></a>
+### 📚 Lecture 129: How Diffing Works
+
 ## 🔧 07. Lesson 129 — _How Diffing Works_
 
+<a id="lesson-129-context"></a>
 ### 🧠 07.1 Context:
 
 **How Diffing Works** is a fundamental lesson that explains React's diffing algorithm, which is the core mechanism React uses to efficiently compare the new Virtual DOM with the current Fiber tree during reconciliation. Understanding diffing is crucial because it explains how React decides whether to update, reuse, or replace components and DOM elements, directly impacting performance and state management.
@@ -1880,6 +2058,7 @@ When `TabContent`'s `likes` state updates:
 4. **Commit Phase**: Updates only the `<span>{likes} ❤️</span>` DOM node's text content
 5. **Result**: Only the likes counter updates, component instance and other state are preserved
 
+<a id="lesson-129-code"></a>
 ### ⚙️ 07.2 Updating according the context:
 
 #### 07.2.1 Render phase:
@@ -1895,7 +2074,7 @@ When `TabContent`'s `likes` state updates:
 ![How Diffing works - same position - same element](../img/section11-lecture129-003.png)
 
 
-### 🐞 07.3 Issues:
+### 🐞 07.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -1912,7 +2091,8 @@ When `TabContent`'s `likes` state updates:
 | **DifferentContent component type change triggers full unmount/mount** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - When switching to `DifferentContent`, React's diffing detects a different element type and unmounts the entire `TabContent` subtree. This is correct behavior but demonstrates how diffing treats different element types. The component could be optimized to use conditional rendering within a single component type to preserve state if needed. |
 | **Missing key prop documentation for diffing optimization** | ℹ️ Low Priority | The project doesn't include comments or documentation explaining why keys are important for React's diffing algorithm. Adding comments explaining how keys help React identify elements during diffing would help developers understand this optimization technique. |
 
-### 🧱 07.4 Pending Fixes (TODO)
+<a id="lesson-129-todo"></a>
+### 🧱 07.3 Pending Fixes (TODO)
 
 - [ ] Add explicit `key` props to `Tab` components in `Tabbed.tsx` (lines 17-20) - Use `key={num}` to enable key-based diffing instead of position-based diffing, improving performance and correctness (`src/components/Tabbed.tsx`)
 - [ ] Wrap `setActiveTab` in `useCallback` in `Tabbed.tsx` to provide stable function reference for diffing comparisons (`src/components/Tabbed.tsx:12`)
@@ -1931,8 +2111,12 @@ When `TabContent`'s `likes` state updates:
 
 <br>
 
+<a id="lesson-130"></a>
+### 📚 Lecture 130: Diffing Rules in Practice
+
 ## 🔧 08. Lesson 130 — _Diffing Rules in Practice_
 
+<a id="lesson-130-context"></a>
 ### 🧠 08.1 Context:
 
 **Diffing Rules in Practice** is a practical demonstration lesson that shows how React's diffing algorithm behaves in real-world scenarios. This lesson builds upon the theoretical understanding from Lesson 129 by providing concrete examples of how React preserves or resets component state based on element type and position during reconciliation. Understanding these practical rules is crucial because they directly impact user experience, state management decisions, and component architecture choices.
@@ -2131,6 +2315,7 @@ The tabbed interface demonstrates both rules:
 
 This practical demonstration makes the abstract concept of diffing concrete and observable, helping developers understand when and why state is preserved or reset in their applications.
 
+<a id="lesson-130-code"></a>
 ### ⚙️ 08.2 Updating code according the context:
 
 #### 08.2.1 Hide the text then click three times on `+` in order to increase the heart amount.
@@ -2162,7 +2347,7 @@ We've got different component is rendered in the same position in the tree. It's
 ![tab2 again](../img/section11-lecture130-005.png)
 `Tab Content` statuses are reset.
 
-### 🐞 08.3 Issues:
+### 🐞 08.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -2172,7 +2357,8 @@ We've got different component is rendered in the same position in the tree. It's
 | **Missing user feedback about state preservation/reset** | ⚠️ Identified | `src/components/Tabbed.tsx:23` - The application doesn't provide any visual indication or explanation to users about why state persists across Tabs 1-3 but resets when switching to Tab 4. While this is intentional for educational purposes, it could benefit from a comment or visual indicator explaining the diffing behavior. |
 | **Hardcoded tab count logic limits extensibility** | ℹ️ Low Priority | `src/components/Tabbed.tsx:23` - The condition `activeTab <= 2` is hardcoded, assuming exactly 3 content tabs (0, 1, 2) and 1 different tab (3). If the `content` array length changes, this logic would need manual updates. A more dynamic approach using `activeTab < content.length` would make the component more flexible. |
 
-### 🧱 08.4 Pending Fixes (TODO)
+<a id="lesson-130-todo"></a>
+### 🧱 08.3 Pending Fixes (TODO)
 
 - [ ] Fix typo in documentation: Change "DiffernetContent" to "DifferentContent" in `docs/LECTURE_STEPS.md:1963`
 - [ ] Consider adding user feedback mechanism to explain state preservation behavior when switching between Tabs 1-3 (e.g., tooltip or info message explaining that state persists because same component type is used)
@@ -2184,8 +2370,12 @@ We've got different component is rendered in the same position in the tree. It's
 
 <br>
 
+<a id="lesson-131"></a>
+### 📚 Lecture 131: The Key Prop
+
 ## 🔧 09. Lesson 131 — _The Key Prop_:
 
+<a id="lesson-131-context"></a>
 ### 🧠 09.1 Context:
 
 The **`key` prop** is a special React attribute that helps React identify which items have changed, been added, or removed from a list. It's also used to force React to reset component state by changing the key value.
@@ -2283,6 +2473,7 @@ The current tabbed interface could benefit from `key` prop in two ways:
 ```
 This would reset `likes` and `showDetails` state each time the user switches tabs, providing independent state per tab.
 
+<a id="lesson-131-code"></a>
 ### ⚙️ 09.2 Updating code according the context:
 
 #### 09.2.1 What is the **key** prop?
@@ -2349,7 +2540,7 @@ This is useful when you want to reset component state without lifting state up t
 **Before**: State persists across tabs (likes count, showDetails toggle remain)
 **After**: State resets when switching tabs (each tab starts fresh)
 
-### 🐞 09.3 Issues:
+### 🐞 09.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -2359,7 +2550,8 @@ This is useful when you want to reset component state without lifting state up t
 | **Potential reconciliation issues if tabs are rendered dynamically** | ℹ️ Low Priority | `src/components/Tabbed.tsx:17-20` - If the tabs were refactored to be rendered from an array using `.map()`, missing keys would cause React warnings and potential reconciliation bugs. While current implementation is manual and doesn't require keys, future refactoring should include keys. |
 | **Hardcoded tab rendering prevents using array.map() with keys** | ℹ️ Low Priority | `src/components/Tabbed.tsx:17-20` - Tabs are manually rendered instead of using `.map()` over an array. This prevents demonstrating proper key usage in lists. Refactoring to use `.map()` would allow proper key implementation and demonstrate list rendering best practices. |
 
-### 🧱 09.4 Pending Fixes (TODO)
+<a id="lesson-131-todo"></a>
+### 🧱 09.3 Pending Fixes (TODO)
 
 - [ ] Add explicit `key` props to `Tab` components in `src/components/Tabbed.tsx:17-20` (e.g., `key={num}`) to improve reconciliation clarity and follow React best practices
 - [ ] Add `key={activeTab}` prop to `TabContent` component in `src/components/Tabbed.tsx:23` to reset state when switching between tabs, providing independent state per tab
@@ -2370,8 +2562,12 @@ This is useful when you want to reset component state without lifting state up t
 
 <br>
 
+<a id="lesson-132"></a>
+### 📚 Lecture 132: Resetting State With the Key Prop
+
 ## 🔧 10. Lesson 132 — _Resetting State With the Key Prop_
 
+<a id="lesson-132-context"></a>
 ### 🧠 10.1 Context:
 
 **Resetting State With the Key Prop** is a React pattern that uses the `key` prop to force React to treat a component as a completely new instance, thereby resetting all its internal state to initial values.
@@ -2464,6 +2660,7 @@ The use of `key={currentItem.summary}` provides independent state per tab, which
 - If the performance cost of remounting is acceptable
 - Whether lifting state to the parent (`Tabbed`) component would provide better UX
 
+<a id="lesson-132-code"></a>
 ### ⚙️ 10.2 Updating code according the context:
 
 #### 10.2.1 Adding `key` as prop in `TabContent`:
@@ -2507,7 +2704,7 @@ export default Tabbed;
 ![tab1](../img/section11-lecture132-001.png)
 ![tab3](../img/section11-lecture132-002.png)
 
-### 🐞 10.3 Issues:
+### 🐞 10.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -2517,7 +2714,8 @@ export default Tabbed;
 | **No visual feedback about state reset behavior** | ⚠️ Identified | `src/components/Tabbed.tsx:27` - Users might be confused when their interactions (likes, show/hide preferences) disappear when switching tabs. There's no indication that state resets occur. Consider adding user feedback (e.g., tooltip, info message) explaining the reset behavior, or provide a way to preserve state if desired. |
 | **Key value depends on content data structure** | ⚠️ Identified | `src/components/Tabbed.tsx:27` - The key is derived from `currentItem.summary`, making it dependent on the content data structure. If the content structure changes or summaries are modified, the key behavior might change unexpectedly. Using `activeTab` as the key would be more stable and predictable. |
 
-### 🧱 10.4 Pending Fixes (TODO)
+<a id="lesson-132-todo"></a>
+### 🧱 10.3 Pending Fixes (TODO)
 
 - [ ] **Change key prop from `currentItem.summary` to `activeTab`** in `src/components/Tabbed.tsx:27` - Using `activeTab` as the key would be more stable, predictable, and doesn't depend on content data structure. This ensures unique keys even if summaries are duplicated.
 
@@ -2537,8 +2735,12 @@ export default Tabbed;
 
 <br>
 
+<a id="lesson-136"></a>
+### 📚 Lecture 136: State Update Batching in Practice
+
 ## 🔧 11. Lesson 136 — _State Update Batching in Practice_
 
+<a id="lesson-136-context"></a>
 ### 🧠 11.1 Context:
 
 **State update batching** is React’s behavior of grouping multiple state updates into a single re-render (and commit), instead of rendering after each individual `setState` call. This is fundamental to how React schedules work and why state updates feel “async”: within the same render/event, you’re working with a **snapshot** of state.
@@ -2577,6 +2779,7 @@ In React 18+ (and therefore React 19, which this project uses), **automatic batc
 - **Combine state** when updates are always coupled (careful: don’t over-couple unrelated UI concerns).
 - **`flushSync` (from `react-dom`)** in rare cases where you truly need to force React to flush updates synchronously (use sparingly).
 
+<a id="lesson-136-code"></a>
 ### ⚙️ 11.2 Updating code according the context:
 
 #### 11.2.1 Implement the `undo` button functionality:
@@ -2820,7 +3023,7 @@ export default TabContent;
 ```
 ![with setTimeout](../img/section11-lecture136-005.png)
 
-### 🐞 11.3 Issues:
+### 🐞 11.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -2830,7 +3033,8 @@ export default TabContent;
 | “State updated is async” logs can be misleading without explanation | ⚠️ Identified | `console.log(..., likes)` right after `setLikes(...)` logs the **previous** value because state updates are queued and the current render holds a snapshot (`src/components/TabContent.tsx:21-25` and `27-41`). |
 | Potential confusion around async batching/closures with `setTimeout(handleUndo, 2000)` | ℹ️ Low Priority | In React 19, updates inside the timeout callback are still batched, but the captured values inside closures may surprise readers. Consider adding an explicit note/comment near `handleUndoLater` (`src/components/TabContent.tsx:43-45`). |
 
-### 🧱 11.4 Pending Fixes (TODO)
+<a id="lesson-136-todo"></a>
+### 🧱 11.3 Pending Fixes (TODO)
 
 - [ ] **Add a short inline explanation about “stale state snapshot” near the logs** in `src/components/TabContent.tsx:21-25` and `src/components/TabContent.tsx:40-41` so it’s explicit that logging `likes` right after `setLikes` prints the previous value.
 - [ ] **Optionally add a `useEffect` debug logger** in `src/components/TabContent.tsx` to show the “after render” value (e.g., `useEffect(() => console.log("likes changed", likes), [likes])`) and compare it to the in-handler logs.
@@ -2839,8 +3043,12 @@ export default TabContent;
 
 <br>
 
+<a id="lesson-137"></a>
+### 📚 Lecture 137: How Events Work in React
+
 ## 🔧 12. Lesson 137 — _How Events work in React_
 
+<a id="lesson-137-context"></a>
 ### 🧠 12.1 Context:
 
 In React, **events** are how the UI reacts to user interactions (clicks, typing, submitting forms, pointer interactions, etc.). Instead of attaching listeners directly via `addEventListener`, React exposes **event props** like `onClick`, `onChange`, `onSubmit`, etc., and wires them up internally.
@@ -2871,6 +3079,7 @@ React primarily relies on **event delegation**, meaning it registers a small num
 - Use native `addEventListener` (inside `useEffect`) for **global events** (`resize`, `scroll`, `keydown` on `window/document`) or for DOM nodes created outside React.
 - Use pointer events (`onPointerDown`, etc.) when you need a unified mouse/touch/stylus model.
 
+<a id="lesson-137-code"></a>
 ### ⚙️ 12.2 Updating code according the context:
 
 #### 12.2.1 **DOM REFRESHER**: Event Propagation and Delegation
@@ -2888,7 +3097,7 @@ React primarily relies on **event delegation**, meaning it registers a small num
 ![Synthetic Events](../img/section11-lecture137-003.png)
 
 
-### 🐞 12.3 Issues:
+### 🐞 12.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -2897,7 +3106,8 @@ React primarily relies on **event delegation**, meaning it registers a small num
 | Inline arrow handlers hide the event object and recreate functions | ℹ️ Low Priority | `src/components/Tab.tsx:9` uses `onClick={() => onClick(num)}` and `src/components/TabContent.tsx:53` uses `onClick={() => setShowDetails(...)}`. This is fine, but it makes it harder to demonstrate `(event) => ...` usage (and creates a new function each render). |
 | No concrete example in the repo for propagation control (`stopPropagation`, capture) | ⚠️ Identified | Lesson 12 discusses propagation/delegation and SyntheticEvent, but the current codebase doesn’t include an explicit demo of bubbling/capture or `event.stopPropagation()`/`event.preventDefault()`. This makes the lesson harder to verify hands-on. |
 
-### 🧱 12.4 Pending Fixes (TODO)
+<a id="lesson-137-todo"></a>
+### 🧱 12.3 Pending Fixes (TODO)
 
 - [ ] **Add a small “EventPropagationDemo” component** (e.g. `src/components/EventPropagationDemo.tsx`) that renders nested clickable elements and logs capture vs bubble, plus a toggle to call `event.stopPropagation()`. Wire it into `src/App.tsx` temporarily for learning.
 - [ ] **Demonstrate using the event object in a handler** (e.g. `const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => { ... }`) so the lesson has at least one concrete, typed SyntheticEvent example.
@@ -2907,8 +3117,12 @@ React primarily relies on **event delegation**, meaning it registers a small num
 
 <br>
 
+<a id="lesson-138"></a>
+### 📚 Lecture 138: Libraries vs. Frameworks & The React Ecosystem
+
 ## 🔧 13. Lesson 138 — _Libraries vs. Frameworks & The React Ecosystem_
 
+<a id="lesson-138-context"></a>
 ### 🧠 13.1 Context:
 
 In frontend development, a **library** is typically a set of reusable building blocks that you **call** from your code, while a **framework** is a more opinionated “system” that **calls your code** and provides a bigger portion of the application structure (routing, data loading conventions, rendering strategy, etc.).
@@ -2960,6 +3174,7 @@ This repo is intentionally minimal (see `package.json`: only `react` and `react-
 - If you need **SSR/SEO, routing, data loading, and deployment conventions**, consider a React framework like **Next.js** or **Remix**.
 - If you prefer an integrated, opinionated approach out of the box, consider frameworks like **Angular** (full framework) or meta-frameworks in other ecosystems.
 
+<a id="lesson-138-code"></a>
 ### ⚙️ 13.2 Updating code according the context:
 
 #### 13.2.1 First, an **Analogy**:
@@ -2980,7 +3195,7 @@ This repo is intentionally minimal (see `package.json`: only `react` and `react-
 
 ![Frameworks built on top of React](../img/section11-lecture138-005.png)
 
-### 🐞 13.3 Issues:
+### 🐞 13.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -2990,7 +3205,8 @@ This repo is intentionally minimal (see `package.json`: only `react` and `react-
 | No hands-on examples of selecting ecosystem libraries | ⚠️ Identified | `package.json` contains only `react`/`react-dom`. That’s good for a minimal demo, but it means Lesson 13 can’t be validated hands-on with examples like routing (`react-router-dom`) or data fetching (TanStack Query). |
 | Non-null assertion in the bootstrap hides “app wiring” responsibilities | ℹ️ Low Priority | `src/main.tsx:6` uses `document.getElementById("root")!`. Frameworks often abstract this away. In a library setup, it can be useful to show a small runtime guard for robustness and teaching clarity. |
 
-### 🧱 13.4 Pending Fixes (TODO)
+<a id="lesson-138-todo"></a>
+### 🧱 13.3 Pending Fixes (TODO)
 
 - [ ] **Add a short clarification line in the README**: explain that `vite` is tooling (dev server/bundler) and that Next.js/Remix are *frameworks on top of React* (file: `README.md`).
 - [ ] **Add a “React ecosystem map” mini-section to the docs** listing common library categories (routing, data fetching, state, forms, styling, UI kits, testing) and when to choose a React framework instead (file: `docs/LECTURE_STEPS.md`, Lesson 13.1).
@@ -3001,8 +3217,12 @@ This repo is intentionally minimal (see `package.json`: only `react` and `react-
 
 <br>
 
+<a id="lesson-139"></a>
+### 📚 Lecture 139: Section Summary — Practical Takeaways
+
 ## 🔧 14. Lesson 139 — _Section Summary: Practical Takeaways_
 
+<a id="lesson-139-context"></a>
 ### 🧠 14.1 Context:
 
 This section is a practical recap of the most important “how React actually behaves” takeaways that show up when you build real UIs:
@@ -3036,6 +3256,7 @@ This section is a practical recap of the most important “how React actually be
 - If you need an opinionated app structure (routing/data loading/SSR conventions), a framework on top of React (e.g. Next.js/Remix) can reduce the amount of manual wiring.
 - If you need to observe state changes reliably, use `useEffect` (instead of logging immediately after calling a state setter).
 
+<a id="lesson-139-code"></a>
 ### ⚙️ 14.2 Updating code according the context:
 
 #### 14.2.1 **Practical** Summary: Components, Rendering, state updates & childrens render
@@ -3057,7 +3278,7 @@ In this repo, clicking a tab (`src/components/Tab.tsx`) updates parent state in 
 Multiple state variables are managed independently in `src/components/TabContent.tsx` (`showDetails`, `likes`) and are updated via React’s event system (`onClick`). The project also shows “React as a library” wiring: `src/main.tsx` manually mounts the app using `createRoot(...).render(...)` (tooling/framework responsibilities remain outside React).
 
 
-### 🐞 14.3 Issues:
+### 🐞 14.4 Issues:
 
 | Issue | Status | Log/Error |
 | ----- | ------ | --------- |
@@ -3067,7 +3288,8 @@ Multiple state variables are managed independently in `src/components/TabContent
 | `key` is based on `summary` (non-guaranteed uniqueness/stability) | ⚠️ Identified | `src/components/Tabbed.tsx:27` uses `key={currentItem.summary}`. If summaries ever collide or change, it can cause unintended remounts/state resets. Using a stable `id` would be safer while still allowing an intentional “reset via key change” demo. |
 | Logging state right after setters can mislead learners | ℹ️ Low Priority | `src/components/TabContent.tsx:24` and `:40` log `likes` immediately after calling setters, which prints the previous render value by design. This is a correct takeaway, but adding a `useEffect` log would show how to observe the committed state change. |
 
-### 🧱 14.4 Pending Fixes (TODO)
+<a id="lesson-139-todo"></a>
+### 🧱 14.3 Pending Fixes (TODO)
 
 - [ ] **Add a short Strict Mode note to the UI or docs** explaining why render logs can appear twice in development (files: `src/main.tsx`, `docs/LECTURE_STEPS.md` Lesson 14.1).
 - [ ] **Make tab items use a stable `id`** and switch `key` from `summary` → `id` to avoid accidental collisions (files: `src/App.tsx`, `src/components/Tabbed.tsx`).
@@ -3076,63 +3298,38 @@ Multiple state variables are managed independently in `src/components/TabContent
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ---
 
-🔥 🔥 🔥
+🔥 🔥 🔥 
 
-<br>
-
-## 🔧 XX. Lesson YYY — _{{TITLE_NAME}}_
+### 📚 Lecture YYY: *{{TITLE_NAME}}*
+## 🔧 XX. Lesson YYY — *{{TITLE_NAME}}*
 
 ### 🧠 XX.1 Context:
+
 
 ### ⚙️ XX.2 Updating code according the context:
 
 #### XX.2.1
-
 ```tsx
 /*  */
+
 ```
 
 #### XX.2.2
-
 ```tsx
 /*  */
+
 ```
 
 ### 🐞 XX.3 Issues:
-
 - **first issue**: something..
 
 | Issue | Status | Log/Error |
-| ----- | ------ | --------- |
+|---|---|---|
 
 ### 🧱 XX.4 Pending Fixes (TODO)
 
+```md
 - [ ]
-
+```
