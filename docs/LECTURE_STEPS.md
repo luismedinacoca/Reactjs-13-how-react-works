@@ -2999,6 +2999,82 @@ This repo is intentionally minimal (see `package.json`: only `react` and `react-
 - [ ] **(Optional) Add one “ecosystem” library example** (TanStack Query or Zustand) in a small, isolated component (e.g. `src/components/EcosystemDemo.tsx`) to demonstrate how third-party libraries integrate with React components.
 
 
+<br>
+
+## 🔧 14. Lesson 139 — _Section Summary: Practical Takeaways_
+
+### 🧠 14.1 Context:
+
+This section is a practical recap of the most important “how React actually behaves” takeaways that show up when you build real UIs:
+
+- **Rendering vs. committing**: React first *renders* (computes the next UI in memory) and then *commits* (applies changes to the DOM). This is why the DOM does not necessarily update at the exact line where you call a state setter.
+- **Re-renders are normal**: A re-render means React re-executes a component function to compute the next UI. It does **not** automatically mean “the DOM changed”.
+- **State updates are queued/batched**: calling a setter like `setLikes(...)` schedules an update; reading `likes` immediately afterwards still reads the previous value from the current render.
+- **Use functional updates when the next state depends on the previous state**: `setLikes(l => l + 1)` avoids stale values and is the correct way to do multiple updates in a row.
+- **Keys define component identity**: React uses `key` to decide whether a component instance should be preserved or replaced. Changing a key can intentionally **reset local state** by forcing a remount.
+- **Side effects must not run during render**: render should be pure; effects belong in `useEffect` (or event handlers). This becomes especially important in development under Strict Mode.
+
+**How this shows up in this project**
+- `src/components/TabContent.tsx`:
+  - logs `🚀 RENDERS!` to make re-renders visible.
+  - demonstrates **functional updates** in `handleTripleInc()` (multiple increments).
+  - demonstrates the “state update is async” gotcha when logging right after setters.
+- `src/components/Tabbed.tsx`:
+  - uses a `key` on `<TabContent />` (`key={currentItem.summary}`) to highlight how keys affect identity and can reset state across tabs.
+- `src/main.tsx`:
+  - wraps the app with `<StrictMode>`, which can intentionally double-invoke renders in development to surface accidental side effects.
+
+**Advantages**
+- You can reason about performance and correctness: *what triggers re-renders*, *when the DOM updates*, and *why state sometimes “looks stale”*.
+- You can intentionally control identity and state resets using keys (when appropriate).
+
+**Disadvantages / gotchas**
+- Console logs can be misleading (especially under Strict Mode) if you interpret “rendered” as “DOM changed”.
+- Using unstable/non-unique keys can cause unexpected remounts, state loss, or subtle UI bugs.
+
+**When to consider alternatives**
+- If you need an opinionated app structure (routing/data loading/SSR conventions), a framework on top of React (e.g. Next.js/Remix) can reduce the amount of manual wiring.
+- If you need to observe state changes reliably, use `useEffect` (instead of logging immediately after calling a state setter).
+
+### ⚙️ 14.2 Updating code according the context:
+
+#### 14.2.1 **Practical** Summary: Components, Rendering, state updates & childrens render
+
+![Components, Rendering, state updates & childrens render](../img/section11-lecture139-001.png)
+
+#### 14.2.2 **Practical** Summary: Diffing, keys, resets & side effects
+
+![Diffing, keys, resets & side effects](../img/section11-lecture139-002.png)
+
+#### 14.2.3 **Practical** Summary: DOM updated, multiple states, synthetic event object & Library vs framework.
+
+![DOM updated, multiple states, synthetic event object & Library vs framework](../img/section11-lecture139-003.png)
+
+In this repo, clicking a tab (`src/components/Tab.tsx`) updates parent state in `src/components/Tabbed.tsx`, which causes `Tabbed` to re-render and (by default) its children to re-render as well. `src/components/TabContent.tsx` logs renders and demonstrates why reading state immediately after `setLikes(...)` still shows the previous value.
+
+`src/components/Tabbed.tsx` also passes a `key` to `<TabContent />`. When the key changes (switching to another tab item), React treats it as a different component instance and local state inside `TabContent` resets (likes/details). This is a practical example of how keys influence identity and diffing decisions.
+
+Multiple state variables are managed independently in `src/components/TabContent.tsx` (`showDetails`, `likes`) and are updated via React’s event system (`onClick`). The project also shows “React as a library” wiring: `src/main.tsx` manually mounts the app using `createRoot(...).render(...)` (tooling/framework responsibilities remain outside React).
+
+
+### 🐞 14.3 Issues:
+
+| Issue | Status | Log/Error |
+| ----- | ------ | --------- |
+| Lesson context was missing | ✅ Fixed | `docs/LECTURE_STEPS.md` Lesson 14 had an empty **14.1 Context**, so the three “practical summary” screenshots weren’t connected to the actual repo behavior (rendering, batching, keys, resets, events). |
+| Placeholder issue/TODO items left in the lesson section | ✅ Fixed | `docs/LECTURE_STEPS.md` Lesson 14 still contained the placeholder “first issue” and an empty TODO checkbox. |
+| Render logs may appear “twice” in dev due to Strict Mode | ℹ️ Low Priority | `src/main.tsx:6-10` wraps the app in `<StrictMode>`. Combined with `src/components/TabContent.tsx:11` (`console.log("🚀 RENDERS!")`), learners can misinterpret duplicated logs as “React is rendering twice incorrectly”. It’s expected in dev. |
+| `key` is based on `summary` (non-guaranteed uniqueness/stability) | ⚠️ Identified | `src/components/Tabbed.tsx:27` uses `key={currentItem.summary}`. If summaries ever collide or change, it can cause unintended remounts/state resets. Using a stable `id` would be safer while still allowing an intentional “reset via key change” demo. |
+| Logging state right after setters can mislead learners | ℹ️ Low Priority | `src/components/TabContent.tsx:24` and `:40` log `likes` immediately after calling setters, which prints the previous render value by design. This is a correct takeaway, but adding a `useEffect` log would show how to observe the committed state change. |
+
+### 🧱 14.4 Pending Fixes (TODO)
+
+- [ ] **Add a short Strict Mode note to the UI or docs** explaining why render logs can appear twice in development (files: `src/main.tsx`, `docs/LECTURE_STEPS.md` Lesson 14.1).
+- [ ] **Make tab items use a stable `id`** and switch `key` from `summary` → `id` to avoid accidental collisions (files: `src/App.tsx`, `src/components/Tabbed.tsx`).
+- [ ] **Add a `useEffect` example for “state changed” logging** (e.g. `useEffect(() => { console.log(likes) }, [likes])`) to contrast with “immediate after setState” logs (file: `src/components/TabContent.tsx`).
+- [ ] **(Optional) Add a tiny “KeysDiffingDemo” list** that reorders/removes items to show why index keys are problematic and how stable keys preserve state correctly (new file: `src/components/KeysDiffingDemo.tsx`, wired in `src/App.tsx` for learning).
+
+
 
 
 
